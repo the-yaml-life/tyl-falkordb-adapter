@@ -1,0 +1,47 @@
+# rustfmt configuration for tyl-falkordb-adapter
+
+# TYL Framework standard formatting configuration
+# This ensures consistency across all TYL modules
+
+# Basic formatting
+edition = "2021"
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+
+# Import organization
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+
+# Function and struct formatting
+fn_single_line = true
+where_single_line = true
+force_explicit_abi = true
+
+# Control flow formatting
+control_brace_style = "AlwaysSameLine"
+brace_style = "SameLineWhere"
+
+# Comments and documentation
+normalize_comments = true
+wrap_comments = true
+format_code_in_doc_comments = true
+
+# Trailing elements
+trailing_comma = "Vertical"
+trailing_semicolon = true
+
+# String formatting
+format_strings = true
+
+# Chain formatting
+chain_width = 60
+single_line_if_else_max_width = 50
+
+# Misc formatting
+blank_lines_upper_bound = 1
+blank_lines_lower_bound = 0
+empty_item_single_line = true
+struct_lit_single_line = true
+fn_params_layout = "Tall"

@@ -1,0 +1,47 @@
+[package]
+name = "tyl-falkordb-adapter"
+version = "0.1.0"
+edition = "2021"
+authors = ["TYL Framework Team"]
+description = "FalkorDB graph database adapter using TYL Framework patterns"
+license = "AGPL-3.0"
+repository = "https://github.com/the-yaml-life/tyl-falkordb-adapter"
+keywords = ["graph", "database", "falkordb", "adapter", "tyl"]
+categories = ["database"]
+
+[dependencies]
+# TYL Framework Core - as per TYL_FRAMEWORK_USAGE_GUIDE.md
+tyl-errors = { git = "https://github.com/the-yaml-life/tyl-errors.git", branch = "main" }
+tyl-config = { git = "https://github.com/the-yaml-life/tyl-config.git", branch = "main" }
+tyl-logging = { git = "https://github.com/the-yaml-life/tyl-logging.git", branch = "main" }
+tyl-tracing = { git = "https://github.com/the-yaml-life/tyl-tracing.git", branch = "main" }
+tyl-db-core = { git = "https://github.com/the-yaml-life/tyl-db-core.git", branch = "main" }
+
+# TYL Graph Port - as per TYL_GRAPH_PORT_GUIDE.md
+tyl-graph-port = { git = "https://github.com/the-yaml-life/tyl-graph-port.git", branch = "main" }
+
+# Core async and networking (minimal for FalkorDB)
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1.74"
+redis = { version = "0.24", features = ["aio", "tokio-comp", "connection-manager"] }
+futures = "0.3"
+
+# Essential serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Essential utilities
+uuid = { version = "1.18", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+rand = "0.8"
+base64 = "0.21"
+serde_yaml = "0.9"
+tracing = "0.1"
+
+[features]
+default = []
+
+[dev-dependencies]
+tokio-test = "0.4"
+testcontainers = "0.15"
