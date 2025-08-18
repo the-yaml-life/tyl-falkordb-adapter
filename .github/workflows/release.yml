@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Wait for FalkorDB to be ready
+      run: |
+        timeout 30 bash -c 'until redis-cli -h 127.0.0.1 -p 6379 ping; do sleep 1; done'
+    
+    - name: Build release
+      run: cargo build --release
+    
+    - name: Run tests
+      run: cargo test --release
+    
+    - name: Test example
+      run: cargo run --example basic_usage --release
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
