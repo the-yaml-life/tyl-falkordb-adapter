@@ -114,13 +114,13 @@ impl FalkorDBAdapter {
         let connection_url = config.connection_url();
 
         let client = Client::open(connection_url.as_str()).map_err(|e| {
-            falkordb_errors::connection_failed(format!("Failed to create client: {}", e))
+            falkordb_errors::connection_failed(format!("Failed to create client: {e}"))
         })?;
 
         let connection = client
             .get_multiplexed_async_connection()
             .await
-            .map_err(|e| falkordb_errors::connection_failed(format!("Failed to connect: {}", e)))?;
+            .map_err(|e| falkordb_errors::connection_failed(format!("Failed to connect: {e}")))?;
 
         // Initialize TYL logging
         let logger = Box::new(JsonLogger::new());
@@ -166,7 +166,7 @@ impl FalkorDBAdapter {
             }
             redis::Value::Data(bytes) => {
                 let s = String::from_utf8(bytes)
-                    .map_err(|e| TylError::internal(format!("Invalid UTF-8: {}", e)))?;
+                    .map_err(|e| TylError::internal(format!("Invalid UTF-8: {e}")))?;
                 Ok(serde_json::json!(s))
             }
             redis::Value::Status(s) => Ok(serde_json::json!(s)),
@@ -196,18 +196,17 @@ impl FalkorDBAdapter {
                 serde_json::Value::Null => "null".to_string(),
                 _ => serde_json::to_string(value).unwrap_or_else(|_| "null".to_string()),
             };
-            property_strings.push(format!("{}: {}", key, value_str));
+            property_strings.push(format!("{key}: {value_str}"));
         }
 
         let properties_clause = if property_strings.is_empty() {
-            format!("id: '{}'", node_id)
+            format!("id: '{node_id}'")
         } else {
             format!("id: '{}', {}", node_id, property_strings.join(", "))
         };
 
         let query = format!(
-            "CREATE (n{} {{{}}}) RETURN n.id",
-            labels_str, properties_clause
+            "CREATE (n{labels_str} {{{properties_clause}}}) RETURN n.id"
         );
 
         self.execute_cypher(&query).await?;
@@ -240,11 +239,11 @@ impl FalkorDBAdapter {
                 serde_json::Value::Null => "null".to_string(),
                 _ => serde_json::to_string(value).unwrap_or_else(|_| "null".to_string()),
             };
-            property_strings.push(format!("{}: {}", key, value_str));
+            property_strings.push(format!("{key}: {value_str}"));
         }
 
         let properties_clause = if property_strings.is_empty() {
-            format!("id: '{}'", rel_id)
+            format!("id: '{rel_id}'")
         } else {
             format!("id: '{}', {}", rel_id, property_strings.join(", "))
         };
@@ -279,7 +278,7 @@ impl DatabaseLifecycle for FalkorDBAdapter {
         let (redis_config, graph_name) = config;
         match Self::new(redis_config, graph_name).await {
             Ok(adapter) => Ok(adapter),
-            Err(e) => Err(TylError::database(format!("Connection failed: {}", e))),
+            Err(e) => Err(TylError::database(format!("Connection failed: {e}"))),
         }
     }
 
