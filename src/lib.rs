@@ -205,9 +205,7 @@ impl FalkorDBAdapter {
             format!("id: '{}', {}", node_id, property_strings.join(", "))
         };
 
-        let query = format!(
-            "CREATE (n{labels_str} {{{properties_clause}}}) RETURN n.id"
-        );
+        let query = format!("CREATE (n{labels_str} {{{properties_clause}}}) RETURN n.id");
 
         self.execute_cypher(&query).await?;
         Ok(node_id)
