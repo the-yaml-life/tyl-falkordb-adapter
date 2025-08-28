@@ -79,7 +79,9 @@ pub mod falkordb_errors {
         TylError::database(format!("Query '{}' failed: {}", query, msg.into()))
     }
 
-    pub fn node_not_found(id: &str) -> TylError { TylError::not_found("graph_node", id) }
+    pub fn node_not_found(id: &str) -> TylError {
+        TylError::not_found("graph_node", id)
+    }
 
     pub fn relationship_not_found(id: &str) -> TylError {
         TylError::not_found("graph_relationship", id)
@@ -89,7 +91,9 @@ pub mod falkordb_errors {
         TylError::validation(field, msg)
     }
 
-    pub fn graph_not_found(graph_id: &str) -> TylError { TylError::not_found("graph", graph_id) }
+    pub fn graph_not_found(graph_id: &str) -> TylError {
+        TylError::not_found("graph", graph_id)
+    }
 }
 
 // Note: GraphNode and GraphRelationship types are now re-exported from
@@ -598,9 +602,7 @@ impl GraphTransaction for FalkorDBAdapter {
         // Log transaction start
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            format!(
-                "Started transaction {transaction_id} for graph {graph_id}"
-            ),
+            format!("Started transaction {transaction_id} for graph {graph_id}"),
         );
         self._logger.log(&record);
 
@@ -637,9 +639,7 @@ impl GraphTransaction for FalkorDBAdapter {
         // Log transaction commit
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            format!(
-                "Committed transaction {transaction_id} for graph {graph_id}"
-            ),
+            format!("Committed transaction {transaction_id} for graph {graph_id}"),
         );
         self._logger.log(&record);
 
@@ -676,9 +676,7 @@ impl GraphTransaction for FalkorDBAdapter {
         // Log transaction rollback
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            format!(
-                "Rolled back transaction {transaction_id} for graph {graph_id}"
-            ),
+            format!("Rolled back transaction {transaction_id} for graph {graph_id}"),
         );
         self._logger.log(&record);
 
@@ -962,9 +960,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
                         "Exists constraint requires exactly one property",
                     )
                 })?;
-                format!(
-                    "CREATE CONSTRAINT ON (n:{labels}) ASSERT exists(n.{property})"
-                )
+                format!("CREATE CONSTRAINT ON (n:{labels}) ASSERT exists(n.{property})")
             }
             ConstraintType::Type => {
                 let labels = constraint_config.labels_or_types.join(":");
@@ -1071,9 +1067,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
         // Log constraint deletion
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            format!(
-                "Dropped constraint '{constraint_name}' from graph {graph_id}"
-            ),
+            format!("Dropped constraint '{constraint_name}' from graph {graph_id}"),
         );
         self._logger.log(&record);
 
@@ -1648,9 +1642,7 @@ impl FalkorDBAdapter {
         // Add relationship type filter if specified
         if !params.relationship_types.is_empty() {
             let types_clause = params.relationship_types.join("|");
-            query_parts[0] = format!(
-                "MATCH (n)-[r:{types_clause}]{direction_clause}(neighbor)"
-            );
+            query_parts[0] = format!("MATCH (n)-[r:{types_clause}]{direction_clause}(neighbor)");
         }
 
         // Add depth limit
@@ -2923,7 +2915,9 @@ impl DatabaseLifecycle for FalkorDBAdapter {
         Ok(())
     }
 
-    fn connection_info(&self) -> String { "FalkorDB(multi-graph)".to_string() }
+    fn connection_info(&self) -> String {
+        "FalkorDB(multi-graph)".to_string()
+    }
 }
 
 // Implementation of GraphAnalytics trait for advanced graph analysis and
@@ -3174,9 +3168,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                         }
                     }
                     Err(e) => {
-                        return Err(TylError::database(format!(
-                            "Label propagation failed: {e}"
-                        )));
+                        return Err(TylError::database(format!("Label propagation failed: {e}")));
                     }
                 }
             }
@@ -3229,9 +3221,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                         }
                     }
                     Err(e) => {
-                        return Err(TylError::database(format!(
-                            "Leiden clustering failed: {e}"
-                        )));
+                        return Err(TylError::database(format!("Leiden clustering failed: {e}")));
                     }
                 }
             }
@@ -3607,9 +3597,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 }
             }
             Err(e) => {
-                return Err(TylError::database(format!(
-                    "Aggregation query failed: {e}"
-                )));
+                return Err(TylError::database(format!("Aggregation query failed: {e}")));
             }
         }
 

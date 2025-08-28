@@ -52,8 +52,7 @@ fn test_error_chain_compatibility() {
     let base_error = falkordb_errors::connection_failed("Redis unavailable");
 
     // This should work with TYL error handling patterns
-    let wrapped_error =
-        TylError::internal(format!("Adapter initialization failed: {base_error}"));
+    let wrapped_error = TylError::internal(format!("Adapter initialization failed: {base_error}"));
 
     assert!(wrapped_error
         .to_string()

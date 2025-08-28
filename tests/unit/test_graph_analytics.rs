@@ -455,9 +455,7 @@ async fn test_recommend_relationships_common_neighbors() {
         assert!(!target_id.is_empty());
         assert!(!rel_type.is_empty());
         assert!((0.0..=1.0).contains(&confidence));
-        println!(
-            "Recommend {target_id} -> {rel_type} with confidence {confidence}"
-        );
+        println!("Recommend {target_id} -> {rel_type} with confidence {confidence}");
     }
 }
 
@@ -490,9 +488,7 @@ async fn test_recommend_relationships_collaborative_filtering() {
     );
     for (target_id, rel_type, confidence) in recommendations {
         assert!((0.0..=1.0).contains(&confidence));
-        println!(
-            "CF recommendation: {target_id} -> {rel_type} ({confidence})"
-        );
+        println!("CF recommendation: {target_id} -> {rel_type} ({confidence})");
     }
 }
 
@@ -531,9 +527,7 @@ async fn test_recommend_relationships_content_based() {
     for (target_id, rel_type, confidence) in recommendations {
         assert_eq!(rel_type, "SIMILAR");
         assert!((0.0..=1.0).contains(&confidence));
-        println!(
-            "Structural equivalence rec: {target_id} -> {rel_type} ({confidence})"
-        );
+        println!("Structural equivalence rec: {target_id} -> {rel_type} ({confidence})");
     }
 }
 
