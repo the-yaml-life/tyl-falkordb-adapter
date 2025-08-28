@@ -1,7 +1,8 @@
 //! Tests for GraphConstraintManager implementation following TYL patterns
 
-use serde_json::json;
 use std::collections::HashMap;
+
+use serde_json::json;
 use tyl_config::RedisConfig;
 use tyl_falkordb_adapter::{
     ConstraintConfig, ConstraintType, FalkorDBAdapter, GraphConstraintManager, GraphInfo,
@@ -37,7 +38,7 @@ async fn create_test_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let graph_info = GraphInfo {
         id: graph_id.to_string(),
-        name: format!("Test Graph {}", graph_id),
+        name: format!("Test Graph {graph_id}"),
         metadata: HashMap::new(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
@@ -386,8 +387,9 @@ async fn test_validate_constraints() {
 
     // Results should be empty if no violations (in unit test context)
     let _results = validation_results.unwrap();
-    // In unit tests, we expect empty results since we're not actually creating violating data
-    // Validation results can be empty or contain validation info depending on implementation
+    // In unit tests, we expect empty results since we're not actually creating
+    // violating data Validation results can be empty or contain validation
+    // info depending on implementation
 }
 
 #[tokio::test]
@@ -458,9 +460,10 @@ async fn test_constraint_validation_edge_cases() {
     // This should fail due to validation logic in implementation
     // Note: The actual validation happens in create_constraint method
     let result = adapter.create_constraint(graph_id, invalid_exists).await;
-    // In our implementation, empty properties might be allowed, but let's test the constraint was created
-    // The actual FalkorDB would validate this
-    assert!(result.is_ok() || result.is_err()); // Either outcome is acceptable for unit test
+    // In our implementation, empty properties might be allowed, but let's test the
+    // constraint was created The actual FalkorDB would validate this
+    assert!(result.is_ok() || result.is_err()); // Either outcome is acceptable
+                                                // for unit test
 }
 
 // Helper function to check if Redis is available
@@ -468,10 +471,7 @@ async fn redis_available() -> bool {
     use redis::Client;
 
     match Client::open("redis://localhost:6379") {
-        Ok(client) => match client.get_connection() {
-            Ok(_) => true,
-            Err(_) => false,
-        },
+        Ok(client) => client.get_connection().is_ok(),
         Err(_) => false,
     }
 }

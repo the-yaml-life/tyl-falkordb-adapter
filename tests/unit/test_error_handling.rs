@@ -11,7 +11,7 @@ fn test_connection_error_categorization() {
     assert!(error.to_string().contains("FalkorDB connection failed"));
 
     // Test error formatting
-    let error_string = format!("{}", error);
+    let error_string = format!("{error}");
     assert!(error_string.contains("timeout"));
 }
 
@@ -53,7 +53,7 @@ fn test_error_chain_compatibility() {
 
     // This should work with TYL error handling patterns
     let wrapped_error =
-        TylError::internal(format!("Adapter initialization failed: {}", base_error));
+        TylError::internal(format!("Adapter initialization failed: {base_error}"));
 
     assert!(wrapped_error
         .to_string()

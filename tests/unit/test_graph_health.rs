@@ -1,7 +1,8 @@
 //! Tests for GraphHealth implementation following TYL patterns
 
-use serde_json::json;
 use std::collections::HashMap;
+
+use serde_json::json;
 use tyl_config::RedisConfig;
 use tyl_falkordb_adapter::{FalkorDBAdapter, GraphHealth, GraphInfo, MultiGraphManager};
 
@@ -34,7 +35,7 @@ async fn create_test_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let graph_info = GraphInfo {
         id: graph_id.to_string(),
-        name: format!("Test Graph {}", graph_id),
+        name: format!("Test Graph {graph_id}"),
         metadata: HashMap::new(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
@@ -90,8 +91,8 @@ async fn test_health_check_comprehensive() {
 
     // Check values
     assert_eq!(health_info.get("connected"), Some(&json!(true)));
-    assert!(health_info.get("status").is_some());
-    assert!(health_info.get("total_graphs").is_some());
+    assert!(health_info.contains_key("status"));
+    assert!(health_info.contains_key("total_graphs"));
 }
 
 #[tokio::test]
@@ -112,7 +113,8 @@ async fn test_health_check_redis_info() {
     // Should have Redis info when connection is healthy
     if health_info.get("connected") == Some(&json!(true)) {
         assert!(health_info.contains_key("redis_info_available"));
-        // May contain memory_usage and connected_clients if INFO command succeeds
+        // May contain memory_usage and connected_clients if INFO command
+        // succeeds
     }
 }
 
@@ -370,10 +372,7 @@ async fn redis_available() -> bool {
     use redis::Client;
 
     match Client::open("redis://localhost:6379") {
-        Ok(client) => match client.get_connection() {
-            Ok(_) => true,
-            Err(_) => false,
-        },
+        Ok(client) => client.get_connection().is_ok(),
         Err(_) => false,
     }
 }

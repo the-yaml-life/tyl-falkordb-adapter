@@ -1,8 +1,11 @@
 //! Tests for GraphAnalytics implementation following TYL patterns
 //! Maintains compatibility with tyl-graph-port as the source of truth
 
-use serde_json::json;
+#![allow(clippy::absurd_extreme_comparisons, unused_comparisons)]
+
 use std::collections::HashMap;
+
+use serde_json::json;
 use tyl_config::RedisConfig;
 use tyl_falkordb_adapter::{FalkorDBAdapter, GraphAnalytics, GraphInfo, MultiGraphManager};
 use tyl_graph_port::{AggregationQuery, CentralityType, ClusteringAlgorithm, RecommendationType};
@@ -36,7 +39,7 @@ async fn create_test_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let graph_info = GraphInfo {
         id: graph_id.to_string(),
-        name: format!("Test Graph {}", graph_id),
+        name: format!("Test Graph {graph_id}"),
         metadata: HashMap::new(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
@@ -71,12 +74,12 @@ fn test_centrality_types() {
     for centrality_type in centrality_types {
         // Verify enum variants are accessible
         match centrality_type {
-            CentralityType::Degree => assert!(true),
-            CentralityType::Betweenness => assert!(true),
-            CentralityType::Closeness => assert!(true),
-            CentralityType::Eigenvector => assert!(true),
-            CentralityType::PageRank => assert!(true),
-            CentralityType::Katz => assert!(true),
+            CentralityType::Degree => {}
+            CentralityType::Betweenness => {}
+            CentralityType::Closeness => {}
+            CentralityType::Eigenvector => {}
+            CentralityType::PageRank => {}
+            CentralityType::Katz => {}
         }
     }
 }
@@ -94,10 +97,10 @@ fn test_clustering_algorithms() {
     for algorithm in algorithms {
         // Verify enum variants are accessible
         match algorithm {
-            ClusteringAlgorithm::Louvain => assert!(true),
-            ClusteringAlgorithm::LabelPropagation => assert!(true),
-            ClusteringAlgorithm::ConnectedComponents => assert!(true),
-            ClusteringAlgorithm::Leiden => assert!(true),
+            ClusteringAlgorithm::Louvain => {}
+            ClusteringAlgorithm::LabelPropagation => {}
+            ClusteringAlgorithm::ConnectedComponents => {}
+            ClusteringAlgorithm::Leiden => {}
         }
     }
 }
@@ -115,10 +118,10 @@ fn test_recommendation_types() {
     for rec_type in rec_types {
         // Verify enum variants are accessible
         match rec_type {
-            RecommendationType::CommonNeighbors => assert!(true),
-            RecommendationType::SimilarNodes => assert!(true),
-            RecommendationType::StructuralEquivalence => assert!(true),
-            RecommendationType::PathSimilarity => assert!(true),
+            RecommendationType::CommonNeighbors => {}
+            RecommendationType::SimilarNodes => {}
+            RecommendationType::StructuralEquivalence => {}
+            RecommendationType::PathSimilarity => {}
         }
     }
 }
@@ -186,7 +189,7 @@ async fn test_calculate_centrality_degree() {
     assert!(centrality_scores.len() >= 0); // Could be empty if no nodes exist
     for (node_id, score) in centrality_scores {
         assert!(score >= 0.0);
-        println!("Node {} has degree centrality: {}", node_id, score);
+        println!("Node {node_id} has degree centrality: {score}");
     }
 }
 
@@ -217,7 +220,7 @@ async fn test_calculate_centrality_betweenness() {
 
     for (node_id, score) in centrality_scores {
         assert!(score >= 0.0);
-        println!("Node {} has betweenness centrality: {}", node_id, score);
+        println!("Node {node_id} has betweenness centrality: {score}");
     }
 }
 
@@ -282,7 +285,7 @@ async fn test_detect_communities_louvain() {
     println!("Found {} community assignments", communities.len());
     for (node_id, community_id) in communities {
         assert!(!community_id.is_empty());
-        println!("Node {} assigned to community {}", node_id, community_id);
+        println!("Node {node_id} assigned to community {community_id}");
     }
 }
 
@@ -316,7 +319,7 @@ async fn test_detect_communities_label_propagation() {
         communities.len()
     );
     for (node_id, community_id) in communities {
-        println!("Node {} in community {}", node_id, community_id);
+        println!("Node {node_id} in community {community_id}");
     }
 }
 
@@ -351,7 +354,7 @@ async fn test_detect_communities_connected_components() {
     );
     for (node_id, component_id) in communities {
         assert!(component_id.starts_with("component_"));
-        println!("Node {} in component {}", node_id, component_id);
+        println!("Node {node_id} in component {component_id}");
     }
 }
 
@@ -417,7 +420,7 @@ async fn test_find_patterns_different_sizes() {
             assert!(frequency >= 1);
         }
 
-        println!("Pattern size {} search completed", size);
+        println!("Pattern size {size} search completed");
     }
 }
 
@@ -451,10 +454,9 @@ async fn test_recommend_relationships_common_neighbors() {
     for (target_id, rel_type, confidence) in recommendations {
         assert!(!target_id.is_empty());
         assert!(!rel_type.is_empty());
-        assert!(confidence >= 0.0 && confidence <= 1.0);
+        assert!((0.0..=1.0).contains(&confidence));
         println!(
-            "Recommend {} -> {} with confidence {}",
-            target_id, rel_type, confidence
+            "Recommend {target_id} -> {rel_type} with confidence {confidence}"
         );
     }
 }
@@ -487,10 +489,9 @@ async fn test_recommend_relationships_collaborative_filtering() {
         recommendations.len()
     );
     for (target_id, rel_type, confidence) in recommendations {
-        assert!(confidence >= 0.0 && confidence <= 1.0);
+        assert!((0.0..=1.0).contains(&confidence));
         println!(
-            "CF recommendation: {} -> {} ({})",
-            target_id, rel_type, confidence
+            "CF recommendation: {target_id} -> {rel_type} ({confidence})"
         );
     }
 }
@@ -529,10 +530,9 @@ async fn test_recommend_relationships_content_based() {
     );
     for (target_id, rel_type, confidence) in recommendations {
         assert_eq!(rel_type, "SIMILAR");
-        assert!(confidence >= 0.0 && confidence <= 1.0);
+        assert!((0.0..=1.0).contains(&confidence));
         println!(
-            "Structural equivalence rec: {} -> {} ({})",
-            target_id, rel_type, confidence
+            "Structural equivalence rec: {target_id} -> {rel_type} ({confidence})"
         );
     }
 }
@@ -729,7 +729,7 @@ async fn test_all_centrality_types() {
         );
         for (node_id, score) in scores {
             assert!(score >= 0.0);
-            println!("  {} = {}", node_id, score);
+            println!("  {node_id} = {score}");
         }
     }
 }
@@ -780,10 +780,7 @@ async fn redis_available() -> bool {
     use redis::Client;
 
     match Client::open("redis://localhost:6379") {
-        Ok(client) => match client.get_connection() {
-            Ok(_) => true,
-            Err(_) => false,
-        },
+        Ok(client) => client.get_connection().is_ok(),
         Err(_) => false,
     }
 }

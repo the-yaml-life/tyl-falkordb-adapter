@@ -3,8 +3,9 @@
 //! This example demonstrates basic graph operations using the FalkorDB adapter
 //! following TYL framework patterns.
 
-use serde_json::json;
 use std::collections::HashMap;
+
+use serde_json::json;
 use tyl_config::RedisConfig;
 use tyl_db_core::DatabaseLifecycle;
 use tyl_errors::TylResult;
@@ -35,7 +36,7 @@ async fn main() -> TylResult<()> {
             adapter
         }
         Err(e) => {
-            println!("❌ Failed to connect: {}", e);
+            println!("❌ Failed to connect: {e}");
             println!(
                 "💡 Make sure FalkorDB (Redis with FalkorDB module) is running on localhost:6379"
             );
@@ -55,7 +56,7 @@ async fn main() -> TylResult<()> {
 
     match adapter.create_graph(graph_info).await {
         Ok(_) => println!("✅ Graph created successfully!"),
-        Err(e) => println!("⚠️  Graph creation failed (might already exist): {}", e),
+        Err(e) => println!("⚠️  Graph creation failed (might already exist): {e}"),
     }
 
     // Test health check using DatabaseLifecycle trait
@@ -68,7 +69,7 @@ async fn main() -> TylResult<()> {
                 println!("⚠️  Adapter health check failed");
             }
         }
-        Err(e) => println!("❌ Health check error: {}", e),
+        Err(e) => println!("❌ Health check error: {e}"),
     }
 
     // Create example nodes
@@ -86,8 +87,8 @@ async fn main() -> TylResult<()> {
         .insert("email".to_string(), json!("alice@example.com"));
 
     match adapter.create_node("example_graph", user_node).await {
-        Ok(node_id) => println!("✅ Created user node: {}", node_id),
-        Err(e) => println!("❌ Failed to create user node: {}", e),
+        Ok(node_id) => println!("✅ Created user node: {node_id}"),
+        Err(e) => println!("❌ Failed to create user node: {e}"),
     }
 
     println!("\n📦 Creating product node...");
@@ -105,8 +106,8 @@ async fn main() -> TylResult<()> {
         .insert("category".to_string(), json!("Electronics"));
 
     match adapter.create_node("example_graph", product_node).await {
-        Ok(node_id) => println!("✅ Created product node: {}", node_id),
-        Err(e) => println!("❌ Failed to create product node: {}", e),
+        Ok(node_id) => println!("✅ Created product node: {node_id}"),
+        Err(e) => println!("❌ Failed to create product node: {e}"),
     }
 
     // Create relationship
@@ -131,8 +132,8 @@ async fn main() -> TylResult<()> {
         .create_relationship("example_graph", purchase_rel)
         .await
     {
-        Ok(rel_id) => println!("✅ Created relationship: {}", rel_id),
-        Err(e) => println!("❌ Failed to create relationship: {}", e),
+        Ok(rel_id) => println!("✅ Created relationship: {rel_id}"),
+        Err(e) => println!("❌ Failed to create relationship: {e}"),
     }
 
     // Query nodes
@@ -140,7 +141,7 @@ async fn main() -> TylResult<()> {
     match adapter.get_node("example_graph", "user_alice").await {
         Ok(Some(_node)) => println!("✅ Found user node: user_alice"),
         Ok(None) => println!("⚠️  User node not found"),
-        Err(e) => println!("❌ Query failed: {}", e),
+        Err(e) => println!("❌ Query failed: {e}"),
     }
 
     // Execute custom Cypher query
@@ -156,7 +157,7 @@ async fn main() -> TylResult<()> {
                     .unwrap_or_else(|_| "Could not format result".to_string())
             );
         }
-        Err(e) => println!("❌ Query failed: {}", e),
+        Err(e) => println!("❌ Query failed: {e}"),
     }
 
     // Test DatabaseLifecycle trait
@@ -184,14 +185,14 @@ async fn main() -> TylResult<()> {
                         println!("⚠️  DatabaseLifecycle health check shows unhealthy");
                     }
                 }
-                Err(e) => println!("❌ DatabaseLifecycle health check failed: {}", e),
+                Err(e) => println!("❌ DatabaseLifecycle health check failed: {e}"),
             }
 
             // Show connection info
             let info = lifecycle_adapter.connection_info();
-            println!("📄 Connection info: {}", info);
+            println!("📄 Connection info: {info}");
         }
-        Err(e) => println!("❌ DatabaseLifecycle::connect() failed: {}", e),
+        Err(e) => println!("❌ DatabaseLifecycle::connect() failed: {e}"),
     }
 
     println!("\n🎉 Example completed!");

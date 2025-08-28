@@ -1,9 +1,12 @@
 //! Tests for GraphTraversal implementation following TYL patterns
 //! Maintains compatibility with tyl-graph-port as the source of truth
 
+#![allow(clippy::absurd_extreme_comparisons, unused_comparisons)]
+
+use std::collections::HashMap;
+
 use chrono::Utc;
 use serde_json::json;
-use std::collections::HashMap;
 use tyl_config::RedisConfig;
 use tyl_falkordb_adapter::{FalkorDBAdapter, GraphInfo, GraphTraversal, MultiGraphManager};
 use tyl_graph_port::{TemporalOperation, TemporalQuery, TraversalDirection, TraversalParams};
@@ -37,7 +40,7 @@ async fn create_test_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let graph_info = GraphInfo {
         id: graph_id.to_string(),
-        name: format!("Test Graph {}", graph_id),
+        name: format!("Test Graph {graph_id}"),
         metadata: HashMap::new(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
@@ -165,7 +168,7 @@ async fn test_find_shortest_path() {
     let path = result.unwrap();
     // Path might be None if no path exists, which is expected
     if let Some(found_path) = path {
-        assert!(found_path.nodes.len() >= 1);
+        assert!(!found_path.nodes.is_empty());
         assert_eq!(found_path.length, found_path.relationships.len());
     }
 }
@@ -197,7 +200,7 @@ async fn test_find_shortest_weighted_path() {
     if let Some(found_path) = weighted_path {
         assert!(found_path.total_weight >= 0.0);
         assert!(found_path.edge_weights.len() >= 0);
-        assert!(found_path.path.nodes.len() >= 1);
+        assert!(!found_path.path.nodes.is_empty());
     }
 }
 
@@ -226,7 +229,7 @@ async fn test_find_all_paths() {
     let paths = result.unwrap();
     // Might be empty if no paths exist
     for path in paths {
-        assert!(path.nodes.len() >= 1);
+        assert!(!path.nodes.is_empty());
         assert_eq!(path.length, path.relationships.len());
     }
 }
@@ -493,10 +496,7 @@ async fn redis_available() -> bool {
     use redis::Client;
 
     match Client::open("redis://localhost:6379") {
-        Ok(client) => match client.get_connection() {
-            Ok(_) => true,
-            Err(_) => false,
-        },
+        Ok(client) => client.get_connection().is_ok(),
         Err(_) => false,
     }
 }

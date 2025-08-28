@@ -1,7 +1,8 @@
 //! TYL FalkorDB Adapter - Graph Database Adapter for TYL Framework
 //!
-//! This adapter implements the TYL Graph Port for FalkorDB (Redis-based graph database),
-//! providing production-ready graph database functionality following TYL Framework patterns.
+//! This adapter implements the TYL Graph Port for FalkorDB (Redis-based graph
+//! database), providing production-ready graph database functionality following
+//! TYL Framework patterns.
 //!
 //! ## Features
 //! - Complete TYL Graph Port implementation with multi-graph support
@@ -12,12 +13,16 @@
 //! - Health monitoring and observability
 
 // Re-export existing TYL functionality
+use std::{collections::HashMap, sync::Arc};
+
+// Standard imports for implementation
+use async_trait::async_trait;
+use chrono::Utc;
+use redis::{aio::MultiplexedConnection, Client};
+use tokio::sync::RwLock;
 pub use tyl_config::{ConfigManager, RedisConfig};
 pub use tyl_db_core::{DatabaseLifecycle, DatabaseResult, HealthStatus};
 pub use tyl_errors::{TylError, TylResult};
-pub use tyl_logging::{LogRecord, Logger};
-pub use tyl_tracing::{span, tracer};
-
 // Re-export tyl-graph-port functionality
 pub use tyl_graph_port::{
     // Missing types for new traits
@@ -59,14 +64,8 @@ pub use tyl_graph_port::{
     WeightMethod,
     WeightedPath,
 };
-
-// Standard imports for implementation
-use async_trait::async_trait;
-use chrono::Utc;
-use redis::{aio::MultiplexedConnection, Client};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+pub use tyl_logging::{LogRecord, Logger};
+pub use tyl_tracing::{span, tracer};
 
 /// Module-specific error helpers following TYL Framework patterns
 pub mod falkordb_errors {
@@ -80,9 +79,7 @@ pub mod falkordb_errors {
         TylError::database(format!("Query '{}' failed: {}", query, msg.into()))
     }
 
-    pub fn node_not_found(id: &str) -> TylError {
-        TylError::not_found("graph_node", id)
-    }
+    pub fn node_not_found(id: &str) -> TylError { TylError::not_found("graph_node", id) }
 
     pub fn relationship_not_found(id: &str) -> TylError {
         TylError::not_found("graph_relationship", id)
@@ -92,13 +89,12 @@ pub mod falkordb_errors {
         TylError::validation(field, msg)
     }
 
-    pub fn graph_not_found(graph_id: &str) -> TylError {
-        TylError::not_found("graph", graph_id)
-    }
+    pub fn graph_not_found(graph_id: &str) -> TylError { TylError::not_found("graph", graph_id) }
 }
 
-// Note: GraphNode and GraphRelationship types are now re-exported from tyl-graph-port
-// This ensures consistency across all graph adapters and prevents duplication
+// Note: GraphNode and GraphRelationship types are now re-exported from
+// tyl-graph-port This ensures consistency across all graph adapters and
+// prevents duplication
 
 /// Graph data structure for multi-graph support
 #[derive(Debug, Clone)]
@@ -124,7 +120,8 @@ impl GraphData {
     }
 }
 
-/// FalkorDB Adapter implementing TYL Graph Port traits for multi-graph functionality
+/// FalkorDB Adapter implementing TYL Graph Port traits for multi-graph
+/// functionality
 pub struct FalkorDBAdapter {
     connection: Arc<RwLock<MultiplexedConnection>>,
     graphs: Arc<RwLock<HashMap<String, GraphData>>>,
@@ -501,7 +498,8 @@ impl GraphStore for FalkorDBAdapter {
         if result.is_null() {
             Ok(None)
         } else {
-            // In a real implementation, this would parse the actual relationship data from FalkorDB
+            // In a real implementation, this would parse the actual relationship data from
+            // FalkorDB
             let mut rel =
                 GraphRelationship::new(id.to_string(), "source".to_string(), "target".to_string());
             rel.relationship_type = "RELATED".to_string();
@@ -600,9 +598,8 @@ impl GraphTransaction for FalkorDBAdapter {
         // Log transaction start
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!(
-                "Started transaction {} for graph {}",
-                transaction_id, graph_id
+            format!(
+                "Started transaction {transaction_id} for graph {graph_id}"
             ),
         );
         self._logger.log(&record);
@@ -640,9 +637,8 @@ impl GraphTransaction for FalkorDBAdapter {
         // Log transaction commit
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!(
-                "Committed transaction {} for graph {}",
-                transaction_id, graph_id
+            format!(
+                "Committed transaction {transaction_id} for graph {graph_id}"
             ),
         );
         self._logger.log(&record);
@@ -680,9 +676,8 @@ impl GraphTransaction for FalkorDBAdapter {
         // Log transaction rollback
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!(
-                "Rolled back transaction {} for graph {}",
-                transaction_id, graph_id
+            format!(
+                "Rolled back transaction {transaction_id} for graph {graph_id}"
             ),
         );
         self._logger.log(&record);
@@ -734,12 +729,12 @@ impl GraphIndexManager for FalkorDBAdapter {
             IndexType::NodeProperty => {
                 let labels = index_config.labels_or_types.join(":");
                 let properties = index_config.properties.join(", ");
-                format!("CREATE INDEX ON :{}({})", labels, properties)
+                format!("CREATE INDEX ON :{labels}({properties})")
             }
             IndexType::RelationshipProperty => {
                 let rel_types = index_config.labels_or_types.join("|");
                 let properties = index_config.properties.join(", ");
-                format!("CREATE INDEX ON ()-[:{}]->()({})", rel_types, properties)
+                format!("CREATE INDEX ON ()-[:{rel_types}]->()({properties})")
             }
             IndexType::Fulltext => {
                 let labels = index_config.labels_or_types.join(":");
@@ -793,7 +788,7 @@ impl GraphIndexManager for FalkorDBAdapter {
         // Log index creation
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!(
+            format!(
                 "Created index '{}' for graph {}",
                 index_config.name, graph_id
             ),
@@ -824,13 +819,13 @@ impl GraphIndexManager for FalkorDBAdapter {
         // Build DROP INDEX command based on index type
         let drop_command = match index_config.index_type {
             IndexType::NodeProperty | IndexType::RelationshipProperty | IndexType::Composite => {
-                format!("DROP INDEX {}", index_name)
+                format!("DROP INDEX {index_name}")
             }
             IndexType::Fulltext => {
-                format!("CALL db.index.fulltext.drop('{}')", index_name)
+                format!("CALL db.index.fulltext.drop('{index_name}')")
             }
             IndexType::Vector => {
-                format!("CALL db.index.vector.drop('{}')", index_name)
+                format!("CALL db.index.vector.drop('{index_name}')")
             }
         };
 
@@ -848,7 +843,7 @@ impl GraphIndexManager for FalkorDBAdapter {
         // Log index deletion
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!("Dropped index '{}' from graph {}", index_name, graph_id),
+            format!("Dropped index '{index_name}' from graph {graph_id}"),
         );
         self._logger.log(&record);
 
@@ -910,7 +905,7 @@ impl GraphIndexManager for FalkorDBAdapter {
         // Log index rebuild
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!("Rebuilt index '{}' for graph {}", index_name, graph_id),
+            format!("Rebuilt index '{index_name}' for graph {graph_id}"),
         );
         self._logger.log(&record);
 
@@ -954,7 +949,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
                     constraint_config
                         .properties
                         .iter()
-                        .map(|p| format!("n.{}", p))
+                        .map(|p| format!("n.{p}"))
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -968,8 +963,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
                     )
                 })?;
                 format!(
-                    "CREATE CONSTRAINT ON (n:{}) ASSERT exists(n.{})",
-                    labels, property
+                    "CREATE CONSTRAINT ON (n:{labels}) ASSERT exists(n.{property})"
                 )
             }
             ConstraintType::Type => {
@@ -989,8 +983,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
                     .unwrap_or("STRING");
 
                 format!(
-                    "CREATE CONSTRAINT ON (n:{}) ASSERT n.{} IS :: {}",
-                    labels, property, expected_type
+                    "CREATE CONSTRAINT ON (n:{labels}) ASSERT n.{property} IS :: {expected_type}"
                 )
             }
             ConstraintType::Range => {
@@ -1011,8 +1004,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
                 })?;
 
                 format!(
-                    "CREATE CONSTRAINT ON (n:{}) ASSERT {} <= n.{} <= {}",
-                    labels, min_value, property, max_value
+                    "CREATE CONSTRAINT ON (n:{labels}) ASSERT {min_value} <= n.{property} <= {max_value}"
                 )
             }
         };
@@ -1033,7 +1025,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
         // Log constraint creation
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!(
+            format!(
                 "Created constraint '{}' for graph {}",
                 constraint_config.name, graph_id
             ),
@@ -1063,7 +1055,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
             constraint_config.ok_or_else(|| TylError::not_found("constraint", constraint_name))?;
 
         // Build DROP CONSTRAINT command
-        let drop_command = format!("DROP CONSTRAINT {}", constraint_name);
+        let drop_command = format!("DROP CONSTRAINT {constraint_name}");
 
         // Execute drop command
         self.execute_cypher(graph_id, &drop_command)
@@ -1079,9 +1071,8 @@ impl GraphConstraintManager for FalkorDBAdapter {
         // Log constraint deletion
         let record = LogRecord::new(
             tyl_logging::LogLevel::Info,
-            &format!(
-                "Dropped constraint '{}' from graph {}",
-                constraint_name, graph_id
+            format!(
+                "Dropped constraint '{constraint_name}' from graph {graph_id}"
             ),
         );
         self._logger.log(&record);
@@ -1145,20 +1136,21 @@ impl GraphConstraintManager for FalkorDBAdapter {
                     let properties = constraint
                         .properties
                         .iter()
-                        .map(|p| format!("n.{}", p))
+                        .map(|p| format!("n.{p}"))
                         .collect::<Vec<_>>()
                         .join(", ");
 
                     format!(
-                        "MATCH (n:{}) WITH {} as key, collect(n) as nodes WHERE size(nodes) > 1 RETURN key, size(nodes) as violations",
-                        labels, properties
+                        "MATCH (n:{labels}) WITH {properties} as key, collect(n) as nodes WHERE size(nodes) > 1 \
+                         RETURN key, size(nodes) as violations"
                     )
                 }
                 ConstraintType::Exists => {
                     let labels = constraint.labels_or_types.join(":");
                     let property = constraint.properties.first().unwrap();
                     format!(
-                        "MATCH (n:{}) WHERE n.{} IS NULL RETURN id(n) as node_id, '{}' as constraint_name",
+                        "MATCH (n:{}) WHERE n.{} IS NULL RETURN id(n) as node_id, '{}' as \
+                         constraint_name",
                         labels, property, constraint.name
                     )
                 }
@@ -1172,8 +1164,8 @@ impl GraphConstraintManager for FalkorDBAdapter {
                         .unwrap_or("STRING");
 
                     format!(
-                        "MATCH (n:{}) WHERE NOT (type(n.{}) = '{}') RETURN id(n) as node_id, type(n.{}) as actual_type, '{}' as expected_type",
-                        labels, property, expected_type, property, expected_type
+                        "MATCH (n:{labels}) WHERE NOT (type(n.{property}) = '{expected_type}') RETURN id(n) as node_id, \
+                         type(n.{property}) as actual_type, '{expected_type}' as expected_type"
                     )
                 }
                 ConstraintType::Range => {
@@ -1183,7 +1175,8 @@ impl GraphConstraintManager for FalkorDBAdapter {
                     let max_value = constraint.options.get("max").unwrap();
 
                     format!(
-                        "MATCH (n:{}) WHERE NOT ({} <= n.{} <= {}) RETURN id(n) as node_id, n.{} as value, '{}' as constraint_name",
+                        "MATCH (n:{}) WHERE NOT ({} <= n.{} <= {}) RETURN id(n) as node_id, n.{} \
+                         as value, '{}' as constraint_name",
                         labels, min_value, property, max_value, property, constraint.name
                     )
                 }
@@ -1211,7 +1204,7 @@ impl GraphConstraintManager for FalkorDBAdapter {
                     // Log validation error but continue with other constraints
                     let record = LogRecord::new(
                         tyl_logging::LogLevel::Warn,
-                        &format!(
+                        format!(
                             "Failed to validate constraint '{}' for graph {}: {}",
                             constraint.name, graph_id, e
                         ),
@@ -1317,9 +1310,10 @@ impl FalkorDBAdapter {
 
         // Process parameters if present
         if !query.parameters.is_empty() {
-            // Simple parameter substitution (in production, use proper parameterized queries)
+            // Simple parameter substitution (in production, use proper parameterized
+            // queries)
             for (param_key, param_value) in &query.parameters {
-                let placeholder = format!("${}", param_key);
+                let placeholder = format!("${param_key}");
                 let value_str = Self::format_cypher_value(param_value);
                 final_query = final_query.replace(&placeholder, &value_str);
             }
@@ -1358,7 +1352,7 @@ impl FalkorDBAdapter {
                     // Convert row array to HashMap
                     let mut row_map = HashMap::new();
                     for (i, value) in row_array.iter().enumerate() {
-                        row_map.insert(format!("column_{}", i), value.clone());
+                        row_map.insert(format!("column_{i}"), value.clone());
                     }
                     result_rows.push(row_map);
                 }
@@ -1415,7 +1409,8 @@ impl FalkorDBAdapter {
     }
 }
 
-// Implementation of GraphTraversal trait for advanced graph navigation and pathfinding
+// Implementation of GraphTraversal trait for advanced graph navigation and
+// pathfinding
 #[async_trait]
 impl GraphTraversal for FalkorDBAdapter {
     /// Get neighbors of a node with traversal parameters
@@ -1648,22 +1643,21 @@ impl FalkorDBAdapter {
         };
 
         let mut query_parts = vec![format!("MATCH (n)-[r]{}(neighbor)", direction_clause)];
-        query_parts.push(format!("WHERE n.id = '{}'", node_id));
+        query_parts.push(format!("WHERE n.id = '{node_id}'"));
 
         // Add relationship type filter if specified
         if !params.relationship_types.is_empty() {
             let types_clause = params.relationship_types.join("|");
             query_parts[0] = format!(
-                "MATCH (n)-[r:{}]{}(neighbor)",
-                types_clause, direction_clause
+                "MATCH (n)-[r:{types_clause}]{direction_clause}(neighbor)"
             );
         }
 
         // Add depth limit
         if let Some(max_depth) = params.max_depth {
             if max_depth > 1 {
-                let depth_clause = format!("*1..{}", max_depth);
-                query_parts[0] = query_parts[0].replace("]", &format!("{}]", depth_clause));
+                let depth_clause = format!("*1..{max_depth}");
+                query_parts[0] = query_parts[0].replace("]", &format!("{depth_clause}]"));
             }
         }
 
@@ -1671,7 +1665,7 @@ impl FalkorDBAdapter {
 
         // Add limit if specified
         if let Some(limit) = params.limit {
-            query_parts.push(format!("LIMIT {}", limit));
+            query_parts.push(format!("LIMIT {limit}"));
         }
 
         Ok(query_parts.join(" "))
@@ -1687,16 +1681,14 @@ impl FalkorDBAdapter {
         let mut query_parts = Vec::new();
 
         // Use FalkorDB's shortest path function
-        query_parts.push(format!("MATCH (start), (end)"));
+        query_parts.push("MATCH (start), (end)".to_string());
         query_parts.push(format!(
-            "WHERE start.id = '{}' AND end.id = '{}'",
-            from_id, to_id
+            "WHERE start.id = '{from_id}' AND end.id = '{to_id}'"
         ));
 
         let max_depth = params.max_depth.unwrap_or(15);
         query_parts.push(format!(
-            "MATCH path = shortestPath((start)-[*1..{}]-(end))",
-            max_depth
+            "MATCH path = shortestPath((start)-[*1..{max_depth}]-(end))"
         ));
         query_parts.push("RETURN path".to_string());
 
@@ -1713,17 +1705,15 @@ impl FalkorDBAdapter {
     ) -> TylResult<String> {
         let mut query_parts = Vec::new();
 
-        query_parts.push(format!("MATCH (start), (end)"));
+        query_parts.push("MATCH (start), (end)".to_string());
         query_parts.push(format!(
-            "WHERE start.id = '{}' AND end.id = '{}'",
-            from_id, to_id
+            "WHERE start.id = '{from_id}' AND end.id = '{to_id}'"
         ));
 
         let max_depth = params.max_depth.unwrap_or(15);
         // FalkorDB weighted shortest path using relationship weight property
         query_parts.push(format!(
-            "CALL algo.shortestPath.stream(start, end, '{}', {{maxDepth: {}}}) YIELD nodeId, cost",
-            weight_property, max_depth
+            "CALL algo.shortestPath.stream(start, end, '{weight_property}', {{maxDepth: {max_depth}}}) YIELD nodeId, cost"
         ));
         query_parts.push("RETURN nodeId, cost".to_string());
 
@@ -1739,22 +1729,20 @@ impl FalkorDBAdapter {
     ) -> TylResult<String> {
         let mut query_parts = Vec::new();
 
-        query_parts.push(format!("MATCH (start), (end)"));
+        query_parts.push("MATCH (start), (end)".to_string());
         query_parts.push(format!(
-            "WHERE start.id = '{}' AND end.id = '{}'",
-            from_id, to_id
+            "WHERE start.id = '{from_id}' AND end.id = '{to_id}'"
         ));
 
         let max_depth = params.max_depth.unwrap_or(10);
         query_parts.push(format!(
-            "MATCH paths = allShortestPaths((start)-[*1..{}]-(end))",
-            max_depth
+            "MATCH paths = allShortestPaths((start)-[*1..{max_depth}]-(end))"
         ));
         query_parts.push("RETURN paths".to_string());
 
         // Add limit if specified
         if let Some(limit) = params.limit {
-            query_parts.push(format!("LIMIT {}", limit));
+            query_parts.push(format!("LIMIT {limit}"));
         }
 
         Ok(query_parts.join(" "))
@@ -1780,7 +1768,7 @@ impl FalkorDBAdapter {
 
         // Add limit if specified
         if let Some(limit) = params.limit {
-            query_parts.push(format!("LIMIT {}", limit));
+            query_parts.push(format!("LIMIT {limit}"));
         }
 
         Ok(query_parts.join(" "))
@@ -1801,7 +1789,7 @@ impl FalkorDBAdapter {
             format!("n:{}", labels.join(":"))
         };
 
-        query_parts.push(format!("MATCH ({})", labels_clause));
+        query_parts.push(format!("MATCH ({labels_clause})"));
 
         // Build properties filter
         if !properties.is_empty() {
@@ -1832,7 +1820,7 @@ impl FalkorDBAdapter {
             format!("r:{}", relationship_types.join("|"))
         };
 
-        query_parts.push(format!("MATCH ()-[{}]-()", types_clause));
+        query_parts.push(format!("MATCH ()-[{types_clause}]-()"));
 
         // Build properties filter
         if !properties.is_empty() {
@@ -1923,7 +1911,7 @@ impl FalkorDBAdapter {
                         let mut relationship = GraphRelationship::new(
                             format!("rel_{}", neighbors.len()),
                             neighbor_node.id.clone(),
-                            format!("source_node"),
+                            "source_node".to_string(),
                         );
                         relationship
                             .properties
@@ -1944,7 +1932,8 @@ impl FalkorDBAdapter {
         result: serde_json::Value,
         _params: &TraversalParams,
     ) -> TylResult<Option<GraphPath>> {
-        // Simplified path parsing - in production this would parse actual FalkorDB path format
+        // Simplified path parsing - in production this would parse actual FalkorDB path
+        // format
         if let Some(data) = result.get("data").and_then(|d| d.as_array()) {
             if !data.is_empty() {
                 let path = GraphPath {
@@ -2030,7 +2019,7 @@ impl FalkorDBAdapter {
                 if let Some(row_array) = row.as_array() {
                     if !row_array.is_empty() {
                         let mut node = GraphNode::new();
-                        node.id = format!("node_{}", i);
+                        node.id = format!("node_{i}");
                         node.properties
                             .insert("data".to_string(), row_array[0].clone());
                         nodes.push(node);
@@ -2054,9 +2043,9 @@ impl FalkorDBAdapter {
                 if let Some(row_array) = row.as_array() {
                     if !row_array.is_empty() {
                         let mut relationship = GraphRelationship::new(
-                            format!("rel_{}", i),
-                            format!("from_{}", i),
-                            format!("to_{}", i),
+                            format!("rel_{i}"),
+                            format!("from_{i}"),
+                            format!("to_{i}"),
                         );
                         relationship
                             .properties
@@ -2071,7 +2060,8 @@ impl FalkorDBAdapter {
     }
 }
 
-// Implementation of GraphBulkOperations trait for efficient bulk data processing
+// Implementation of GraphBulkOperations trait for efficient bulk data
+// processing
 #[async_trait]
 impl GraphBulkOperations for FalkorDBAdapter {
     /// Bulk create multiple nodes efficiently
@@ -2228,8 +2218,7 @@ impl GraphBulkOperations for FalkorDBAdapter {
                     // Add error results for this batch
                     for (node_id, _) in batch {
                         results.push(Err(TylError::database(format!(
-                            "Failed to update node {}: {}",
-                            node_id, e
+                            "Failed to update node {node_id}: {e}"
                         ))));
                     }
                 }
@@ -2278,8 +2267,7 @@ impl GraphBulkOperations for FalkorDBAdapter {
                     // Add error results for this batch
                     for node_id in batch {
                         results.push(Err(TylError::database(format!(
-                            "Failed to delete node {}: {}",
-                            node_id, e
+                            "Failed to delete node {node_id}: {e}"
                         ))));
                     }
                 }
@@ -2317,10 +2305,10 @@ impl GraphBulkOperations for FalkorDBAdapter {
             "json" => {
                 // Parse JSON data
                 let json_str = String::from_utf8(data)
-                    .map_err(|e| TylError::validation("import", format!("Invalid UTF-8: {}", e)))?;
+                    .map_err(|e| TylError::validation("import", format!("Invalid UTF-8: {e}")))?;
 
                 let graph_data: serde_json::Value = serde_json::from_str(&json_str)
-                    .map_err(|e| TylError::validation("import", format!("Invalid JSON: {}", e)))?;
+                    .map_err(|e| TylError::validation("import", format!("Invalid JSON: {e}")))?;
 
                 // Process nodes and relationships from JSON
                 let (nodes_created, rels_created) =
@@ -2332,7 +2320,7 @@ impl GraphBulkOperations for FalkorDBAdapter {
             "csv" => {
                 // Basic CSV import (simplified)
                 let csv_str = String::from_utf8(data)
-                    .map_err(|e| TylError::validation("import", format!("Invalid UTF-8: {}", e)))?;
+                    .map_err(|e| TylError::validation("import", format!("Invalid UTF-8: {e}")))?;
 
                 let rows_processed = self.import_csv_data(graph_id, &csv_str).await?;
                 import_stats.insert("rows_processed".to_string(), json!(rows_processed));
@@ -2340,7 +2328,7 @@ impl GraphBulkOperations for FalkorDBAdapter {
             "cypher" => {
                 // Execute Cypher script
                 let cypher_script = String::from_utf8(data)
-                    .map_err(|e| TylError::validation("import", format!("Invalid UTF-8: {}", e)))?;
+                    .map_err(|e| TylError::validation("import", format!("Invalid UTF-8: {e}")))?;
 
                 let result = self.execute_cypher(graph_id, &cypher_script).await?;
                 import_stats.insert("query_result".to_string(), result);
@@ -2348,7 +2336,7 @@ impl GraphBulkOperations for FalkorDBAdapter {
             _ => {
                 return Err(TylError::validation(
                     "import",
-                    format!("Unsupported import format: {}", import_format),
+                    format!("Unsupported import format: {import_format}"),
                 ));
             }
         }
@@ -2395,7 +2383,7 @@ impl GraphBulkOperations for FalkorDBAdapter {
             }
             _ => Err(TylError::validation(
                 "export",
-                format!("Unsupported export format: {}", export_format),
+                format!("Unsupported export format: {export_format}"),
             )),
         }
     }
@@ -2422,7 +2410,7 @@ impl FalkorDBAdapter {
                 TylError::validation("bulk_create", format!("Invalid properties: {e}"))
             })?;
 
-            query_parts.push(format!("CREATE (n{}{} {})", i, labels, props_json));
+            query_parts.push(format!("CREATE (n{i}{labels} {props_json})"));
         }
 
         Ok(query_parts.join(" "))
@@ -2470,7 +2458,7 @@ impl FalkorDBAdapter {
 
             for (key, value) in properties.iter() {
                 let value_str = Self::format_cypher_value(value);
-                set_clauses.push(format!("n.{} = {}", key, value_str));
+                set_clauses.push(format!("n.{key} = {value_str}"));
             }
 
             if !set_clauses.is_empty() {
@@ -2493,13 +2481,12 @@ impl FalkorDBAdapter {
 
         let ids_list = node_ids
             .iter()
-            .map(|id| format!("'{}'", id))
+            .map(|id| format!("'{id}'"))
             .collect::<Vec<_>>()
             .join(", ");
 
         Ok(format!(
-            "MATCH (n) WHERE n.id IN [{}] DETACH DELETE n",
-            ids_list
+            "MATCH (n) WHERE n.id IN [{ids_list}] DETACH DELETE n"
         ))
     }
 
@@ -2565,7 +2552,7 @@ impl FalkorDBAdapter {
             if values.len() == headers.len() {
                 // Create a simple node from CSV row
                 let mut node = GraphNode::new();
-                node.id = format!("csv_node_{}", rows_processed);
+                node.id = format!("csv_node_{rows_processed}");
 
                 for (header, value) in headers.iter().zip(values.iter()) {
                     node.properties.insert(
@@ -2604,8 +2591,8 @@ impl FalkorDBAdapter {
             "metadata": graph_data.info.metadata
         });
 
-        Ok(serde_json::to_string_pretty(&export_data)
-            .map_err(|e| TylError::database(format!("JSON export error: {e}")))?)
+        serde_json::to_string_pretty(&export_data)
+            .map_err(|e| TylError::database(format!("JSON export error: {e}")))
     }
 
     /// Helper function to export to CSV
@@ -2647,7 +2634,7 @@ impl FalkorDBAdapter {
             .ok_or_else(|| graph_not_found(graph_id))?;
 
         let mut cypher_statements = Vec::new();
-        cypher_statements.push(format!("// Cypher export for graph: {}", graph_id));
+        cypher_statements.push(format!("// Cypher export for graph: {graph_id}"));
         cypher_statements.push(format!(
             "// Generated at: {}",
             chrono::Utc::now().to_rfc3339()
@@ -2662,7 +2649,7 @@ impl FalkorDBAdapter {
             };
 
             let props = serde_json::to_string(&node.properties).unwrap_or("{}".to_string());
-            cypher_statements.push(format!("CREATE ({}{})", labels, props));
+            cypher_statements.push(format!("CREATE ({labels}{props})"));
         }
 
         Ok(cypher_statements.join("\n"))
@@ -2936,12 +2923,11 @@ impl DatabaseLifecycle for FalkorDBAdapter {
         Ok(())
     }
 
-    fn connection_info(&self) -> String {
-        "FalkorDB(multi-graph)".to_string()
-    }
+    fn connection_info(&self) -> String { "FalkorDB(multi-graph)".to_string() }
 }
 
-// Implementation of GraphAnalytics trait for advanced graph analysis and intelligence
+// Implementation of GraphAnalytics trait for advanced graph analysis and
+// intelligence
 #[async_trait]
 impl GraphAnalytics for FalkorDBAdapter {
     /// Calculate centrality measures for nodes
@@ -2975,8 +2961,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Calculate degree centrality using Cypher
                 for node_id in target_nodes {
                     let cypher_query = format!(
-                        "MATCH (n)-[r]-(m) WHERE n.id = '{}' RETURN count(r) AS degree",
-                        node_id
+                        "MATCH (n)-[r]-(m) WHERE n.id = '{node_id}' RETURN count(r) AS degree"
                     );
 
                     match self.execute_cypher(graph_id, &cypher_query).await {
@@ -2998,8 +2983,8 @@ impl GraphAnalytics for FalkorDBAdapter {
                 for node_id in target_nodes {
                     // Count paths passing through this node (simplified)
                     let cypher_query = format!(
-                        "MATCH (a)-[*1..3]-({})-[*1..3]-(b) WHERE a.id <> b.id AND a.id <> '{}' AND b.id <> '{}' RETURN count(*) AS paths",
-                        node_id, node_id, node_id
+                        "MATCH (a)-[*1..3]-({node_id})-[*1..3]-(b) WHERE a.id <> b.id AND a.id <> '{node_id}' \
+                         AND b.id <> '{node_id}' RETURN count(*) AS paths"
                     );
 
                     match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3019,8 +3004,9 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Calculate closeness centrality (reciprocal of average shortest path length)
                 for node_id in target_nodes {
                     let cypher_query = format!(
-                        "MATCH (n), (m) WHERE n.id = '{}' AND m.id <> '{}' WITH n, m, shortestPath((n)-[*]-(m)) AS path RETURN avg(length(path)) AS avg_distance",
-                        node_id, node_id
+                        "MATCH (n), (m) WHERE n.id = '{node_id}' AND m.id <> '{node_id}' WITH n, m, \
+                         shortestPath((n)-[*]-(m)) AS path RETURN avg(length(path)) AS \
+                         avg_distance"
                     );
 
                     match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3045,8 +3031,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 for node_id in target_nodes {
                     // Use degree as approximation for eigenvector centrality
                     let cypher_query = format!(
-                        "MATCH (n)-[r]-(m) WHERE n.id = '{}' RETURN count(r) AS connections",
-                        node_id
+                        "MATCH (n)-[r]-(m) WHERE n.id = '{node_id}' RETURN count(r) AS connections"
                     );
 
                     match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3068,8 +3053,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Simplified PageRank using degree as approximation
                 for node_id in target_nodes {
                     let cypher_query = format!(
-                        "MATCH (n)-[r]-(m) WHERE n.id = '{}' RETURN count(r) AS degree",
-                        node_id
+                        "MATCH (n)-[r]-(m) WHERE n.id = '{node_id}' RETURN count(r) AS degree"
                     );
 
                     match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3089,8 +3073,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Simplified Katz centrality using degree
                 for node_id in target_nodes {
                     let cypher_query = format!(
-                        "MATCH (n)-[r]-(m) WHERE n.id = '{}' RETURN count(r) AS connections",
-                        node_id
+                        "MATCH (n)-[r]-(m) WHERE n.id = '{node_id}' RETURN count(r) AS connections"
                     );
 
                     match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3133,7 +3116,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Simplified community detection using connected components
                 let cypher_query = "MATCH (n) RETURN n.id AS node_id";
 
-                match self.execute_cypher(graph_id, &cypher_query).await {
+                match self.execute_cypher(graph_id, cypher_query).await {
                     Ok(result) => {
                         if let Some(data) = result.get("data").and_then(|d| d.as_array()) {
                             for (index, row) in data.iter().enumerate() {
@@ -3151,8 +3134,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Community detection failed: {}",
-                            e
+                            "Community detection failed: {e}"
                         )));
                     }
                 }
@@ -3161,7 +3143,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Simple label propagation simulation
                 let cypher_query = "MATCH (n) RETURN n.id AS node_id, labels(n) AS node_labels";
 
-                match self.execute_cypher(graph_id, &cypher_query).await {
+                match self.execute_cypher(graph_id, cypher_query).await {
                     Ok(result) => {
                         if let Some(data) = result.get("data").and_then(|d| d.as_array()) {
                             for row in data.iter() {
@@ -3193,8 +3175,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Label propagation failed: {}",
-                            e
+                            "Label propagation failed: {e}"
                         )));
                     }
                 }
@@ -3203,7 +3184,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Find connected components
                 let cypher_query = "MATCH (n) RETURN n.id AS node_id";
 
-                match self.execute_cypher(graph_id, &cypher_query).await {
+                match self.execute_cypher(graph_id, cypher_query).await {
                     Ok(result) => {
                         if let Some(data) = result.get("data").and_then(|d| d.as_array()) {
                             for (component_id, row) in data.iter().enumerate() {
@@ -3213,7 +3194,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                                     {
                                         communities.insert(
                                             node_id.to_string(),
-                                            format!("component_{}", component_id),
+                                            format!("component_{component_id}"),
                                         );
                                     }
                                 }
@@ -3222,8 +3203,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Connected components failed: {}",
-                            e
+                            "Connected components failed: {e}"
                         )));
                     }
                 }
@@ -3232,7 +3212,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 // Simplified Leiden algorithm (similar to Louvain)
                 let cypher_query = "MATCH (n) RETURN n.id AS node_id";
 
-                match self.execute_cypher(graph_id, &cypher_query).await {
+                match self.execute_cypher(graph_id, cypher_query).await {
                     Ok(result) => {
                         if let Some(data) = result.get("data").and_then(|d| d.as_array()) {
                             for (index, row) in data.iter().enumerate() {
@@ -3250,8 +3230,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Leiden clustering failed: {}",
-                            e
+                            "Leiden clustering failed: {e}"
                         )));
                     }
                 }
@@ -3279,9 +3258,18 @@ impl GraphAnalytics for FalkorDBAdapter {
 
         // Find common patterns based on relationship types
         let cypher_query = match pattern_size {
-            2 => "MATCH (a)-[r1]->(b) RETURN type(r1) AS pattern, count(*) AS frequency ORDER BY frequency DESC",
-            3 => "MATCH (a)-[r1]->(b)-[r2]->(c) RETURN type(r1) + '->' + type(r2) AS pattern, count(*) AS frequency ORDER BY frequency DESC",
-            _ => "MATCH (a)-[r1]->(b)-[r2]->(c)-[r3]->(d) RETURN type(r1) + '->' + type(r2) + '->' + type(r3) AS pattern, count(*) AS frequency ORDER BY frequency DESC",
+            2 => {
+                "MATCH (a)-[r1]->(b) RETURN type(r1) AS pattern, count(*) AS frequency ORDER BY \
+                 frequency DESC"
+            }
+            3 => {
+                "MATCH (a)-[r1]->(b)-[r2]->(c) RETURN type(r1) + '->' + type(r2) AS pattern, \
+                 count(*) AS frequency ORDER BY frequency DESC"
+            }
+            _ => {
+                "MATCH (a)-[r1]->(b)-[r2]->(c)-[r3]->(d) RETURN type(r1) + '->' + type(r2) + '->' \
+                 + type(r3) AS pattern, count(*) AS frequency ORDER BY frequency DESC"
+            }
         };
 
         match self.execute_cypher(graph_id, cypher_query).await {
@@ -3301,7 +3289,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                                     // Add placeholder nodes and relationships
                                     for i in 0..pattern_size {
                                         let mut node = tyl_graph_port::GraphNode::new();
-                                        node.id = format!("pattern_node_{}", i);
+                                        node.id = format!("pattern_node_{i}");
                                         path.nodes.push(node);
                                     }
 
@@ -3313,7 +3301,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                 }
             }
             Err(e) => {
-                return Err(TylError::database(format!("Pattern finding failed: {}", e)));
+                return Err(TylError::database(format!("Pattern finding failed: {e}")));
             }
         }
 
@@ -3341,12 +3329,11 @@ impl GraphAnalytics for FalkorDBAdapter {
             tyl_graph_port::RecommendationType::CommonNeighbors => {
                 // Find nodes with common neighbors
                 let cypher_query = format!(
-                    "MATCH (source {{id: '{}'}})-[:*1..2]-(common)-[:*1..2]-(target) 
+                    "MATCH (source {{id: '{node_id}'}})-[:*1..2]-(common)-[:*1..2]-(target) 
                      WHERE target.id <> source.id AND NOT (source)--(target)
                      RETURN target.id AS target_id, count(common) AS common_count 
                      ORDER BY common_count DESC 
-                     LIMIT {}",
-                    node_id, limit
+                     LIMIT {limit}"
                 );
 
                 match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3371,8 +3358,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Common neighbors recommendation failed: {}",
-                            e
+                            "Common neighbors recommendation failed: {e}"
                         )));
                     }
                 }
@@ -3380,12 +3366,11 @@ impl GraphAnalytics for FalkorDBAdapter {
             tyl_graph_port::RecommendationType::SimilarNodes => {
                 // Find similar nodes based on relationship patterns
                 let cypher_query = format!(
-                    "MATCH (source {{id: '{}'}})-[r]-(neighbor)-[r2]-(similar)
+                    "MATCH (source {{id: '{node_id}'}})-[r]-(neighbor)-[r2]-(similar)
                      WHERE similar.id <> source.id AND NOT (source)--(similar)
                      RETURN similar.id AS target_id, type(r2) AS rel_type, count(*) AS similarity
                      ORDER BY similarity DESC 
-                     LIMIT {}",
-                    node_id, limit
+                     LIMIT {limit}"
                 );
 
                 match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3411,8 +3396,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Similar nodes recommendation failed: {}",
-                            e
+                            "Similar nodes recommendation failed: {e}"
                         )));
                     }
                 }
@@ -3420,11 +3404,10 @@ impl GraphAnalytics for FalkorDBAdapter {
             tyl_graph_port::RecommendationType::StructuralEquivalence => {
                 // Find nodes with similar properties
                 let cypher_query = format!(
-                    "MATCH (source {{id: '{}'}}), (target)
+                    "MATCH (source {{id: '{node_id}'}}), (target)
                      WHERE target.id <> source.id AND NOT (source)--(target)
                      RETURN target.id AS target_id, 'SIMILAR' AS rel_type, 0.5 AS confidence
-                     LIMIT {}",
-                    node_id, limit
+                     LIMIT {limit}"
                 );
 
                 match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3449,8 +3432,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Structural equivalence recommendation failed: {}",
-                            e
+                            "Structural equivalence recommendation failed: {e}"
                         )));
                     }
                 }
@@ -3458,11 +3440,10 @@ impl GraphAnalytics for FalkorDBAdapter {
             tyl_graph_port::RecommendationType::PathSimilarity => {
                 // Find nodes based on path similarity
                 let cypher_query = format!(
-                    "MATCH (source {{id: '{}'}})-[*1..2]-(intermediate)-[*1..2]-(target)
+                    "MATCH (source {{id: '{node_id}'}})-[*1..2]-(intermediate)-[*1..2]-(target)
                      WHERE target.id <> source.id AND NOT (source)--(target)
                      RETURN target.id AS target_id, 'PATH_SIMILAR' AS rel_type, 0.6 AS confidence
-                     LIMIT {}",
-                    node_id, limit
+                     LIMIT {limit}"
                 );
 
                 match self.execute_cypher(graph_id, &cypher_query).await {
@@ -3487,8 +3468,7 @@ impl GraphAnalytics for FalkorDBAdapter {
                     }
                     Err(e) => {
                         return Err(TylError::database(format!(
-                            "Path similarity recommendation failed: {}",
-                            e
+                            "Path similarity recommendation failed: {e}"
                         )));
                     }
                 }
@@ -3526,11 +3506,11 @@ impl GraphAnalytics for FalkorDBAdapter {
                 .iter()
                 .map(|(key, value)| {
                     if let Some(str_val) = value.as_str() {
-                        format!("n.{} = '{}'", key, str_val)
+                        format!("n.{key} = '{str_val}'")
                     } else if let Some(num_val) = value.as_f64() {
-                        format!("n.{} = {}", key, num_val)
+                        format!("n.{key} = {num_val}")
                     } else {
-                        format!("n.{} = {}", key, value)
+                        format!("n.{key} = {value}")
                     }
                 })
                 .collect();
@@ -3545,28 +3525,28 @@ impl GraphAnalytics for FalkorDBAdapter {
             }
             tyl_graph_port::AggregationFunction::Sum => {
                 if let Some(prop) = &aggregation_query.property {
-                    return_clauses.push(format!("sum(n.{}) AS sum_result", prop));
+                    return_clauses.push(format!("sum(n.{prop}) AS sum_result"));
                 } else {
                     return_clauses.push("count(n) AS count_result".to_string());
                 }
             }
             tyl_graph_port::AggregationFunction::Avg => {
                 if let Some(prop) = &aggregation_query.property {
-                    return_clauses.push(format!("avg(n.{}) AS avg_result", prop));
+                    return_clauses.push(format!("avg(n.{prop}) AS avg_result"));
                 } else {
                     return_clauses.push("count(n) AS count_result".to_string());
                 }
             }
             tyl_graph_port::AggregationFunction::Min => {
                 if let Some(prop) = &aggregation_query.property {
-                    return_clauses.push(format!("min(n.{}) AS min_result", prop));
+                    return_clauses.push(format!("min(n.{prop}) AS min_result"));
                 } else {
                     return_clauses.push("count(n) AS count_result".to_string());
                 }
             }
             tyl_graph_port::AggregationFunction::Max => {
                 if let Some(prop) = &aggregation_query.property {
-                    return_clauses.push(format!("max(n.{}) AS max_result", prop));
+                    return_clauses.push(format!("max(n.{prop}) AS max_result"));
                 } else {
                     return_clauses.push("count(n) AS count_result".to_string());
                 }
@@ -3583,7 +3563,7 @@ impl GraphAnalytics for FalkorDBAdapter {
             let group_fields: Vec<String> = aggregation_query
                 .group_by
                 .iter()
-                .map(|field| format!("n.{}", field))
+                .map(|field| format!("n.{field}"))
                 .collect();
             cypher_parts.push(format!("WITH {}", group_fields.join(", ")));
             return_clauses.insert(0, group_fields.join(", "));
@@ -3628,8 +3608,7 @@ impl GraphAnalytics for FalkorDBAdapter {
             }
             Err(e) => {
                 return Err(TylError::database(format!(
-                    "Aggregation query failed: {}",
-                    e
+                    "Aggregation query failed: {e}"
                 )));
             }
         }

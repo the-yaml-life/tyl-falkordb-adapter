@@ -1,9 +1,10 @@
 //! Tests for GraphBulkOperations implementation following TYL patterns
 //! Maintains compatibility with tyl-graph-port as the source of truth
 
+use std::collections::HashMap;
+
 use chrono::Utc;
 use serde_json::json;
-use std::collections::HashMap;
 use tyl_config::RedisConfig;
 use tyl_falkordb_adapter::{FalkorDBAdapter, GraphBulkOperations, GraphInfo, MultiGraphManager};
 use tyl_graph_port::{BulkOperation, GraphNode, GraphRelationship};
@@ -37,7 +38,7 @@ async fn create_test_graph(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let graph_info = GraphInfo {
         id: graph_id.to_string(),
-        name: format!("Test Graph {}", graph_id),
+        name: format!("Test Graph {graph_id}"),
         metadata: HashMap::new(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
@@ -56,7 +57,7 @@ fn create_test_nodes(count: usize) -> Vec<GraphNode> {
 
     for i in 0..count {
         let mut node = GraphNode::new();
-        node.id = format!("bulk_node_{}", i);
+        node.id = format!("bulk_node_{i}");
         node.labels = vec!["TestNode".to_string()];
         node.properties
             .insert("name".to_string(), json!(format!("Node {}", i)));
@@ -76,12 +77,12 @@ fn create_test_relationships(count: usize) -> Vec<GraphRelationship> {
 
     for i in 0..count {
         let mut rel = GraphRelationship::new(
-            format!("bulk_node_{}", i),
+            format!("bulk_node_{i}"),
             format!("bulk_node_{}", (i + 1) % count),
             "CONNECTS_TO".to_string(),
         );
-        rel.id = format!("bulk_rel_{}", i);
-        rel.from_node_id = format!("bulk_node_{}", i);
+        rel.id = format!("bulk_rel_{i}");
+        rel.from_node_id = format!("bulk_node_{i}");
         rel.to_node_id = format!("bulk_node_{}", (i + 1) % count);
         rel.relationship_type = "CONNECTS_TO".to_string();
         rel.properties
@@ -202,11 +203,11 @@ async fn test_bulk_create_nodes_basic() {
     for (i, res) in results.iter().enumerate() {
         match res {
             Ok(node_id) => {
-                assert_eq!(*node_id, format!("bulk_node_{}", i));
+                assert_eq!(*node_id, format!("bulk_node_{i}"));
             }
             Err(_) => {
                 // Acceptable if Redis has constraints or data issues
-                println!("Node creation failed (expected in unit tests): {:?}", res);
+                println!("Node creation failed (expected in unit tests): {res:?}");
             }
         }
     }
@@ -241,11 +242,11 @@ async fn test_bulk_create_relationships_basic() {
     for (i, res) in results.iter().enumerate() {
         match res {
             Ok(rel_id) => {
-                assert_eq!(*rel_id, format!("bulk_rel_{}", i));
+                assert_eq!(*rel_id, format!("bulk_rel_{i}"));
             }
             Err(_) => {
                 // Expected if referenced nodes don't exist
-                println!("Relationship creation failed (expected): {:?}", res);
+                println!("Relationship creation failed (expected): {res:?}");
             }
         }
     }
@@ -295,7 +296,7 @@ async fn test_bulk_update_nodes_basic() {
                 println!("Update succeeded");
             }
             Err(_) => {
-                println!("Update failed (expected if nodes don't exist): {:?}", res);
+                println!("Update failed (expected if nodes don't exist): {res:?}");
             }
         }
     }
@@ -398,10 +399,10 @@ async fn test_import_data_json() {
 
     // Verify import stats for nodes and relationships
     if let Some(nodes_created) = import_stats.get("nodes_created") {
-        println!("Nodes created: {}", nodes_created);
+        println!("Nodes created: {nodes_created}");
     }
     if let Some(rels_created) = import_stats.get("relationships_created") {
-        println!("Relationships created: {}", rels_created);
+        println!("Relationships created: {rels_created}");
     }
 }
 
@@ -436,7 +437,7 @@ async fn test_import_data_csv() {
     assert_eq!(import_stats.get("success"), Some(&json!(true)));
 
     if let Some(rows_processed) = import_stats.get("rows_processed") {
-        println!("CSV rows processed: {}", rows_processed);
+        println!("CSV rows processed: {rows_processed}");
     }
 }
 
@@ -690,10 +691,7 @@ async fn redis_available() -> bool {
     use redis::Client;
 
     match Client::open("redis://localhost:6379") {
-        Ok(client) => match client.get_connection() {
-            Ok(_) => true,
-            Err(_) => false,
-        },
+        Ok(client) => client.get_connection().is_ok(),
         Err(_) => false,
     }
 }

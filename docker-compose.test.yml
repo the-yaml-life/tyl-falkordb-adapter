@@ -1,0 +1,68 @@
+# Docker Compose configuration for FalkorDB integration testing
+# This file sets up FalkorDB instances for running integration tests
+
+services:
+  # FalkorDB instance for integration tests
+  falkordb-test:
+    image: falkordb/falkordb:latest
+    container_name: falkordb-test
+    ports:
+      - "6379:6379"  # Redis protocol port
+    environment:
+      - REDIS_ARGS=--protected-mode no --bind 0.0.0.0
+    command: >
+      redis-server
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+      --loadmodule /usr/lib/redis/modules/falkordb.so
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - falkordb-test-network
+
+  # Optional: FalkorDB instance for parallel testing (different port)
+  falkordb-test-parallel:
+    image: falkordb/falkordb:latest
+    container_name: falkordb-test-parallel
+    ports:
+      - "6380:6379"  # Different external port
+    environment:
+      - REDIS_ARGS=--protected-mode no --bind 0.0.0.0
+    command: >
+      redis-server
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+      --loadmodule /usr/lib/redis/modules/falkordb.so
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - falkordb-test-network
+
+  # Test runner service (optional - for CI environments)
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      falkordb-test:
+        condition: service_healthy
+    environment:
+      - FALKORDB_TEST_URL=redis://falkordb-test:6379
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    networks:
+      - falkordb-test-network
+    profiles:
+      - test  # Only start with --profile test
+
+networks:
+  falkordb-test-network:
+    driver: bridge

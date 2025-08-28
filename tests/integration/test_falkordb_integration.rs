@@ -1,7 +1,8 @@
 //! Integration tests that require a running FalkorDB instance
 
-use serde_json::json;
 use std::collections::HashMap;
+
+use serde_json::json;
 use tyl_config::RedisConfig;
 use tyl_db_core::DatabaseLifecycle;
 use tyl_falkordb_adapter::{
