@@ -4,12 +4,8 @@
 use serde_json::json;
 use std::collections::HashMap;
 use tyl_config::RedisConfig;
-use tyl_falkordb_adapter::{
-    FalkorDBAdapter, GraphInfo, GraphAnalytics, MultiGraphManager,
-};
-use tyl_graph_port::{
-    CentralityType, ClusteringAlgorithm, RecommendationType, AggregationQuery,
-};
+use tyl_falkordb_adapter::{FalkorDBAdapter, GraphAnalytics, GraphInfo, MultiGraphManager};
+use tyl_graph_port::{AggregationQuery, CentralityType, ClusteringAlgorithm, RecommendationType};
 
 /// Helper function to create test adapter
 async fn create_test_adapter() -> FalkorDBAdapter {
@@ -22,7 +18,7 @@ async fn create_test_adapter() -> FalkorDBAdapter {
         pool_size: 5,
         timeout_seconds: 10,
     };
-    
+
     // This will fail without Redis, which is expected for unit tests
     match FalkorDBAdapter::new(config).await {
         Ok(adapter) => adapter,
@@ -45,8 +41,11 @@ async fn create_test_graph(
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     };
-    
-    adapter.create_graph(graph_info).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+    adapter
+        .create_graph(graph_info)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
     Ok(())
 }
 
@@ -68,7 +67,7 @@ fn test_centrality_types() {
         CentralityType::PageRank,
         CentralityType::Katz,
     ];
-    
+
     for centrality_type in centrality_types {
         // Verify enum variants are accessible
         match centrality_type {
@@ -91,7 +90,7 @@ fn test_clustering_algorithms() {
         ClusteringAlgorithm::ConnectedComponents,
         ClusteringAlgorithm::Leiden,
     ];
-    
+
     for algorithm in algorithms {
         // Verify enum variants are accessible
         match algorithm {
@@ -112,7 +111,7 @@ fn test_recommendation_types() {
         RecommendationType::StructuralEquivalence,
         RecommendationType::PathSimilarity,
     ];
-    
+
     for rec_type in rec_types {
         // Verify enum variants are accessible
         match rec_type {
@@ -127,8 +126,11 @@ fn test_recommendation_types() {
 #[test]
 fn test_aggregation_query_creation() {
     let query = create_test_aggregation_query();
-    
-    assert!(matches!(query.function, tyl_graph_port::AggregationFunction::Count));
+
+    assert!(matches!(
+        query.function,
+        tyl_graph_port::AggregationFunction::Count
+    ));
     assert_eq!(query.group_by.len(), 1);
     assert_eq!(query.group_by[0], "age");
     assert_eq!(query.filters.len(), 1);
@@ -142,22 +144,17 @@ async fn test_calculate_centrality_nonexistent_graph() {
         println!("Skipping centrality test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let node_ids = vec!["test_node_1".to_string()];
-    
+
     // Try to calculate centrality on non-existent graph
-    let result = adapter.calculate_centrality(
-        "non_existent_graph", 
-        node_ids, 
-        CentralityType::Degree
-    ).await;
-    
+    let result = adapter
+        .calculate_centrality("non_existent_graph", node_ids, CentralityType::Degree)
+        .await;
+
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Graph not found"));
+    assert!(result.unwrap_err().to_string().contains("Graph not found"));
 }
 
 #[tokio::test]
@@ -167,26 +164,24 @@ async fn test_calculate_centrality_degree() {
         println!("Skipping degree centrality test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "centrality_degree_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let node_ids = vec!["node_1".to_string(), "node_2".to_string()];
-    
-    let result = adapter.calculate_centrality(
-        graph_id, 
-        node_ids, 
-        CentralityType::Degree
-    ).await;
-    
+
+    let result = adapter
+        .calculate_centrality(graph_id, node_ids, CentralityType::Degree)
+        .await;
+
     assert!(result.is_ok());
     let centrality_scores = result.unwrap();
-    
+
     // Should return scores for requested nodes
     assert!(centrality_scores.len() >= 0); // Could be empty if no nodes exist
     for (node_id, score) in centrality_scores {
@@ -202,26 +197,24 @@ async fn test_calculate_centrality_betweenness() {
         println!("Skipping betweenness centrality test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "centrality_betweenness_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let node_ids = vec!["node_1".to_string()];
-    
-    let result = adapter.calculate_centrality(
-        graph_id, 
-        node_ids, 
-        CentralityType::Betweenness
-    ).await;
-    
+
+    let result = adapter
+        .calculate_centrality(graph_id, node_ids, CentralityType::Betweenness)
+        .await;
+
     assert!(result.is_ok());
     let centrality_scores = result.unwrap();
-    
+
     for (node_id, score) in centrality_scores {
         assert!(score >= 0.0);
         println!("Node {} has betweenness centrality: {}", node_id, score);
@@ -235,25 +228,27 @@ async fn test_calculate_centrality_empty_nodes() {
         println!("Skipping empty nodes centrality test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "centrality_empty_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     // Empty node list should analyze all nodes
-    let result = adapter.calculate_centrality(
-        graph_id, 
-        vec![], // Empty - should analyze all nodes
-        CentralityType::Degree
-    ).await;
-    
+    let result = adapter
+        .calculate_centrality(
+            graph_id,
+            vec![], // Empty - should analyze all nodes
+            CentralityType::Degree,
+        )
+        .await;
+
     assert!(result.is_ok());
     let centrality_scores = result.unwrap();
-    
+
     // Result might be empty if no nodes exist in graph
     println!("Analyzed {} nodes for centrality", centrality_scores.len());
 }
@@ -265,26 +260,24 @@ async fn test_detect_communities_louvain() {
         println!("Skipping Louvain community detection test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "community_louvain_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let params = HashMap::new();
-    
-    let result = adapter.detect_communities(
-        graph_id, 
-        ClusteringAlgorithm::Louvain, 
-        params
-    ).await;
-    
+
+    let result = adapter
+        .detect_communities(graph_id, ClusteringAlgorithm::Louvain, params)
+        .await;
+
     assert!(result.is_ok());
     let communities = result.unwrap();
-    
+
     // Community assignment might be empty if no nodes exist
     println!("Found {} community assignments", communities.len());
     for (node_id, community_id) in communities {
@@ -300,27 +293,28 @@ async fn test_detect_communities_label_propagation() {
         println!("Skipping label propagation test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "community_label_prop_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let params = HashMap::new();
-    
-    let result = adapter.detect_communities(
-        graph_id, 
-        ClusteringAlgorithm::LabelPropagation, 
-        params
-    ).await;
-    
+
+    let result = adapter
+        .detect_communities(graph_id, ClusteringAlgorithm::LabelPropagation, params)
+        .await;
+
     assert!(result.is_ok());
     let communities = result.unwrap();
-    
-    println!("Label propagation found {} community assignments", communities.len());
+
+    println!(
+        "Label propagation found {} community assignments",
+        communities.len()
+    );
     for (node_id, community_id) in communities {
         println!("Node {} in community {}", node_id, community_id);
     }
@@ -333,27 +327,28 @@ async fn test_detect_communities_connected_components() {
         println!("Skipping connected components test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "community_components_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let params = HashMap::new();
-    
-    let result = adapter.detect_communities(
-        graph_id, 
-        ClusteringAlgorithm::ConnectedComponents, 
-        params
-    ).await;
-    
+
+    let result = adapter
+        .detect_communities(graph_id, ClusteringAlgorithm::ConnectedComponents, params)
+        .await;
+
     assert!(result.is_ok());
     let communities = result.unwrap();
-    
-    println!("Connected components found {} assignments", communities.len());
+
+    println!(
+        "Connected components found {} assignments",
+        communities.len()
+    );
     for (node_id, component_id) in communities {
         assert!(component_id.starts_with("component_"));
         println!("Node {} in component {}", node_id, component_id);
@@ -367,25 +362,28 @@ async fn test_find_patterns_basic() {
         println!("Skipping pattern finding test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "patterns_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let result = adapter.find_patterns(graph_id, 2, 1).await;
-    
+
     assert!(result.is_ok());
     let patterns = result.unwrap();
-    
+
     println!("Found {} patterns", patterns.len());
     for (path, frequency) in patterns {
         assert!(frequency >= 1);
         assert!(path.length >= 0);
-        println!("Pattern with length {} appears {} times", path.length, frequency);
+        println!(
+            "Pattern with length {} appears {} times",
+            path.length, frequency
+        );
     }
 }
 
@@ -396,29 +394,29 @@ async fn test_find_patterns_different_sizes() {
         println!("Skipping pattern sizes test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "patterns_sizes_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     // Test different pattern sizes
     let sizes = [2, 3, 4];
-    
+
     for size in sizes {
         let result = adapter.find_patterns(graph_id, size, 1).await;
-        
+
         assert!(result.is_ok());
         let patterns = result.unwrap();
-        
+
         for (path, frequency) in patterns {
             assert_eq!(path.length, size);
             assert!(frequency >= 1);
         }
-        
+
         println!("Pattern size {} search completed", size);
     }
 }
@@ -430,31 +428,34 @@ async fn test_recommend_relationships_common_neighbors() {
         println!("Skipping common neighbors recommendation test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "recommend_common_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
-    let result = adapter.recommend_relationships(
-        graph_id, 
-        "user_123", 
-        RecommendationType::CommonNeighbors, 
-        5
-    ).await;
-    
+
+    let result = adapter
+        .recommend_relationships(graph_id, "user_123", RecommendationType::CommonNeighbors, 5)
+        .await;
+
     assert!(result.is_ok());
     let recommendations = result.unwrap();
-    
-    println!("Common neighbors found {} recommendations", recommendations.len());
+
+    println!(
+        "Common neighbors found {} recommendations",
+        recommendations.len()
+    );
     for (target_id, rel_type, confidence) in recommendations {
         assert!(!target_id.is_empty());
         assert!(!rel_type.is_empty());
         assert!(confidence >= 0.0 && confidence <= 1.0);
-        println!("Recommend {} -> {} with confidence {}", target_id, rel_type, confidence);
+        println!(
+            "Recommend {} -> {} with confidence {}",
+            target_id, rel_type, confidence
+        );
     }
 }
 
@@ -465,29 +466,32 @@ async fn test_recommend_relationships_collaborative_filtering() {
         println!("Skipping collaborative filtering test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "recommend_collaborative_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
-    let result = adapter.recommend_relationships(
-        graph_id, 
-        "user_456", 
-        RecommendationType::SimilarNodes, 
-        3
-    ).await;
-    
+
+    let result = adapter
+        .recommend_relationships(graph_id, "user_456", RecommendationType::SimilarNodes, 3)
+        .await;
+
     assert!(result.is_ok());
     let recommendations = result.unwrap();
-    
-    println!("Collaborative filtering found {} recommendations", recommendations.len());
+
+    println!(
+        "Collaborative filtering found {} recommendations",
+        recommendations.len()
+    );
     for (target_id, rel_type, confidence) in recommendations {
         assert!(confidence >= 0.0 && confidence <= 1.0);
-        println!("CF recommendation: {} -> {} ({})", target_id, rel_type, confidence);
+        println!(
+            "CF recommendation: {} -> {} ({})",
+            target_id, rel_type, confidence
+        );
     }
 }
 
@@ -498,30 +502,38 @@ async fn test_recommend_relationships_content_based() {
         println!("Skipping content-based recommendation test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "recommend_content_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
-    let result = adapter.recommend_relationships(
-        graph_id, 
-        "user_789", 
-        RecommendationType::StructuralEquivalence, 
-        10
-    ).await;
-    
+
+    let result = adapter
+        .recommend_relationships(
+            graph_id,
+            "user_789",
+            RecommendationType::StructuralEquivalence,
+            10,
+        )
+        .await;
+
     assert!(result.is_ok());
     let recommendations = result.unwrap();
-    
-    println!("Content-based found {} recommendations", recommendations.len());
+
+    println!(
+        "Content-based found {} recommendations",
+        recommendations.len()
+    );
     for (target_id, rel_type, confidence) in recommendations {
         assert_eq!(rel_type, "SIMILAR");
         assert!(confidence >= 0.0 && confidence <= 1.0);
-        println!("Structural equivalence rec: {} -> {} ({})", target_id, rel_type, confidence);
+        println!(
+            "Structural equivalence rec: {} -> {} ({})",
+            target_id, rel_type, confidence
+        );
     }
 }
 
@@ -532,22 +544,22 @@ async fn test_execute_aggregation_basic() {
         println!("Skipping aggregation test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "aggregation_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let query = create_test_aggregation_query();
-    
+
     let result = adapter.execute_aggregation(graph_id, query).await;
-    
+
     assert!(result.is_ok());
     let aggregation_results = result.unwrap();
-    
+
     println!("Aggregation returned {} results", aggregation_results.len());
     for agg_result in aggregation_results {
         // The value field should contain the aggregated result
@@ -564,24 +576,27 @@ async fn test_execute_aggregation_count_only() {
         println!("Skipping count aggregation test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "aggregation_count_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let query = AggregationQuery::count();
-    
+
     let result = adapter.execute_aggregation(graph_id, query).await;
-    
+
     assert!(result.is_ok());
     let aggregation_results = result.unwrap();
-    
+
     // Should have at least one result with count
-    println!("Count aggregation returned {} results", aggregation_results.len());
+    println!(
+        "Count aggregation returned {} results",
+        aggregation_results.len()
+    );
 }
 
 #[tokio::test]
@@ -591,29 +606,32 @@ async fn test_execute_aggregation_with_filters() {
         println!("Skipping filtered aggregation test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "aggregation_filter_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let mut filters = HashMap::new();
     filters.insert("active".to_string(), json!(true));
     filters.insert("age".to_string(), json!(25));
-    
+
     let query = AggregationQuery::count()
         .with_filter("active", json!(true))
         .with_filter("age", json!(25));
-    
+
     let result = adapter.execute_aggregation(graph_id, query).await;
-    
+
     assert!(result.is_ok());
     let aggregation_results = result.unwrap();
-    
-    println!("Filtered aggregation returned {} results", aggregation_results.len());
+
+    println!(
+        "Filtered aggregation returned {} results",
+        aggregation_results.len()
+    );
     assert!(aggregation_results.len() <= 5); // Respects limit
 }
 
@@ -624,37 +642,48 @@ async fn test_analytics_with_nonexistent_graph() {
         println!("Skipping nonexistent graph analytics test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let non_existent_graph = "does_not_exist";
-    
+
     // Test all analytics methods with non-existent graph
-    
+
     // Centrality
-    let centrality_result = adapter.calculate_centrality(
-        non_existent_graph, vec![], CentralityType::Degree
-    ).await;
+    let centrality_result = adapter
+        .calculate_centrality(non_existent_graph, vec![], CentralityType::Degree)
+        .await;
     assert!(centrality_result.is_err());
-    
+
     // Communities
-    let community_result = adapter.detect_communities(
-        non_existent_graph, ClusteringAlgorithm::Louvain, HashMap::new()
-    ).await;
+    let community_result = adapter
+        .detect_communities(
+            non_existent_graph,
+            ClusteringAlgorithm::Louvain,
+            HashMap::new(),
+        )
+        .await;
     assert!(community_result.is_err());
-    
+
     // Patterns
     let pattern_result = adapter.find_patterns(non_existent_graph, 2, 1).await;
     assert!(pattern_result.is_err());
-    
+
     // Recommendations
-    let recommend_result = adapter.recommend_relationships(
-        non_existent_graph, "node_1", RecommendationType::CommonNeighbors, 5
-    ).await;
+    let recommend_result = adapter
+        .recommend_relationships(
+            non_existent_graph,
+            "node_1",
+            RecommendationType::CommonNeighbors,
+            5,
+        )
+        .await;
     assert!(recommend_result.is_err());
-    
+
     // Aggregation
     let agg_query = create_test_aggregation_query();
-    let agg_result = adapter.execute_aggregation(non_existent_graph, agg_query).await;
+    let agg_result = adapter
+        .execute_aggregation(non_existent_graph, agg_query)
+        .await;
     assert!(agg_result.is_err());
 }
 
@@ -665,15 +694,15 @@ async fn test_all_centrality_types() {
         println!("Skipping all centrality types test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "all_centrality_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let centrality_types = [
         CentralityType::Degree,
         CentralityType::Betweenness,
@@ -682,20 +711,22 @@ async fn test_all_centrality_types() {
         CentralityType::PageRank,
         CentralityType::Katz,
     ];
-    
+
     let node_ids = vec!["test_node".to_string()];
-    
+
     for centrality_type in centrality_types {
-        let result = adapter.calculate_centrality(
-            graph_id, 
-            node_ids.clone(), 
-            centrality_type.clone()
-        ).await;
-        
+        let result = adapter
+            .calculate_centrality(graph_id, node_ids.clone(), centrality_type.clone())
+            .await;
+
         assert!(result.is_ok());
         let scores = result.unwrap();
-        
-        println!("Centrality type {:?} returned {} scores", centrality_type, scores.len());
+
+        println!(
+            "Centrality type {:?} returned {} scores",
+            centrality_type,
+            scores.len()
+        );
         for (node_id, score) in scores {
             assert!(score >= 0.0);
             println!("  {} = {}", node_id, score);
@@ -710,38 +741,44 @@ async fn test_recommendation_limits() {
         println!("Skipping recommendation limits test - Redis not available");
         return;
     }
-    
+
     let adapter = create_test_adapter().await;
     let graph_id = "recommend_limits_test";
-    
+
     // Create test graph
     if create_test_graph(&adapter, graph_id).await.is_err() {
         return; // Skip if can't create graph
     }
-    
+
     let limits = [1, 3, 5, 10];
-    
+
     for limit in limits {
-        let result = adapter.recommend_relationships(
-            graph_id, 
-            "user_test", 
-            RecommendationType::CommonNeighbors, 
-            limit
-        ).await;
-        
+        let result = adapter
+            .recommend_relationships(
+                graph_id,
+                "user_test",
+                RecommendationType::CommonNeighbors,
+                limit,
+            )
+            .await;
+
         assert!(result.is_ok());
         let recommendations = result.unwrap();
-        
+
         // Should not exceed the limit
         assert!(recommendations.len() <= limit);
-        println!("Limit {} returned {} recommendations", limit, recommendations.len());
+        println!(
+            "Limit {} returned {} recommendations",
+            limit,
+            recommendations.len()
+        );
     }
 }
 
 // Helper function to check if Redis is available
 async fn redis_available() -> bool {
     use redis::Client;
-    
+
     match Client::open("redis://localhost:6379") {
         Ok(client) => match client.get_connection() {
             Ok(_) => true,
