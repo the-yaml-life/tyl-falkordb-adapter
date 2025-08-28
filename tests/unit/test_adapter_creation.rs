@@ -16,10 +16,8 @@ async fn test_adapter_creation_with_valid_config() {
         timeout_seconds: 10,
     };
 
-    let graph_name = "test_graph".to_string();
-
     // This will fail without a running Redis instance, which is expected
-    let result = FalkorDBAdapter::new(config, graph_name).await;
+    let result = FalkorDBAdapter::new(config).await;
 
     // Verify error is properly formatted with TYL patterns
     if let Err(error) = result {
@@ -57,7 +55,8 @@ fn test_falkordb_error_helpers() {
 fn test_graph_node_creation() {
     use tyl_falkordb_adapter::GraphNode;
 
-    let node = GraphNode::new("test_node_123".to_string());
+    let mut node = GraphNode::new();
+    node.id = "test_node_123".to_string();
 
     assert_eq!(node.id, "test_node_123");
     assert!(node.labels.is_empty());
@@ -70,12 +69,12 @@ fn test_graph_node_creation() {
 fn test_graph_relationship_creation() {
     use tyl_falkordb_adapter::GraphRelationship;
 
-    let relationship = GraphRelationship::new(
-        "rel_123".to_string(),
+    let mut relationship = GraphRelationship::new(
         "node_1".to_string(),
         "node_2".to_string(),
         "CONNECTS".to_string(),
     );
+    relationship.id = "rel_123".to_string();
 
     assert_eq!(relationship.id, "rel_123");
     assert_eq!(relationship.from_node_id, "node_1");

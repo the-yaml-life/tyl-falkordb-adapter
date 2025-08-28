@@ -4,10 +4,13 @@
 //! following TYL framework patterns.
 
 use serde_json::json;
+use std::collections::HashMap;
 use tyl_config::RedisConfig;
 use tyl_db_core::DatabaseLifecycle;
 use tyl_errors::TylResult;
-use tyl_falkordb_adapter::{FalkorDBAdapter, GraphNode, GraphRelationship};
+use tyl_falkordb_adapter::{
+    FalkorDBAdapter, GraphInfo, GraphNode, GraphRelationship, GraphStore, MultiGraphManager,
+};
 
 #[tokio::main]
 async fn main() -> TylResult<()> {
@@ -26,7 +29,7 @@ async fn main() -> TylResult<()> {
     };
 
     println!("🔗 Connecting to FalkorDB...");
-    let adapter = match FalkorDBAdapter::new(config, "example_graph".to_string()).await {
+    let adapter = match FalkorDBAdapter::new(config).await {
         Ok(adapter) => {
             println!("✅ Connected successfully!");
             adapter
@@ -40,17 +43,38 @@ async fn main() -> TylResult<()> {
         }
     };
 
-    // Test health check using adapter's direct method
+    // Create graph using MultiGraphManager
+    println!("🗂️  Creating graph...");
+    let graph_info = GraphInfo {
+        id: "example_graph".to_string(),
+        name: "Example Graph".to_string(),
+        metadata: HashMap::new(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+
+    match adapter.create_graph(graph_info).await {
+        Ok(_) => println!("✅ Graph created successfully!"),
+        Err(e) => println!("⚠️  Graph creation failed (might already exist): {}", e),
+    }
+
+    // Test health check using DatabaseLifecycle trait
     println!("\n🏥 Checking adapter health...");
     match adapter.health_check().await {
-        Ok(true) => println!("✅ Adapter is healthy!"),
-        Ok(false) => println!("⚠️  Adapter health check failed"),
+        Ok(health_result) => {
+            if health_result.status.is_healthy() {
+                println!("✅ Adapter is healthy!");
+            } else {
+                println!("⚠️  Adapter health check failed");
+            }
+        }
         Err(e) => println!("❌ Health check error: {}", e),
     }
 
     // Create example nodes
     println!("\n👤 Creating user node...");
-    let mut user_node = GraphNode::new("user_alice".to_string());
+    let mut user_node = GraphNode::new();
+    user_node.id = "user_alice".to_string();
     user_node.labels.push("User".to_string());
     user_node.labels.push("Person".to_string());
     user_node
@@ -61,13 +85,14 @@ async fn main() -> TylResult<()> {
         .properties
         .insert("email".to_string(), json!("alice@example.com"));
 
-    match adapter.create_node(user_node).await {
+    match adapter.create_node("example_graph", user_node).await {
         Ok(node_id) => println!("✅ Created user node: {}", node_id),
         Err(e) => println!("❌ Failed to create user node: {}", e),
     }
 
     println!("\n📦 Creating product node...");
-    let mut product_node = GraphNode::new("product_laptop".to_string());
+    let mut product_node = GraphNode::new();
+    product_node.id = "product_laptop".to_string();
     product_node.labels.push("Product".to_string());
     product_node
         .properties
@@ -79,7 +104,7 @@ async fn main() -> TylResult<()> {
         .properties
         .insert("category".to_string(), json!("Electronics"));
 
-    match adapter.create_node(product_node).await {
+    match adapter.create_node("example_graph", product_node).await {
         Ok(node_id) => println!("✅ Created product node: {}", node_id),
         Err(e) => println!("❌ Failed to create product node: {}", e),
     }
@@ -90,8 +115,8 @@ async fn main() -> TylResult<()> {
         "purchase_001".to_string(),
         "user_alice".to_string(),
         "product_laptop".to_string(),
-        "PURCHASED".to_string(),
     );
+    purchase_rel.relationship_type = "PURCHASED".to_string();
     purchase_rel
         .properties
         .insert("date".to_string(), json!("2024-01-15"));
@@ -102,14 +127,17 @@ async fn main() -> TylResult<()> {
         .properties
         .insert("payment_method".to_string(), json!("credit_card"));
 
-    match adapter.create_relationship(purchase_rel).await {
+    match adapter
+        .create_relationship("example_graph", purchase_rel)
+        .await
+    {
         Ok(rel_id) => println!("✅ Created relationship: {}", rel_id),
         Err(e) => println!("❌ Failed to create relationship: {}", e),
     }
 
     // Query nodes
     println!("\n🔍 Querying user node...");
-    match adapter.get_node("user_alice").await {
+    match adapter.get_node("example_graph", "user_alice").await {
         Ok(Some(_node)) => println!("✅ Found user node: user_alice"),
         Ok(None) => println!("⚠️  User node not found"),
         Err(e) => println!("❌ Query failed: {}", e),
@@ -119,7 +147,7 @@ async fn main() -> TylResult<()> {
     println!("\n📊 Executing custom Cypher query...");
     let cypher_query =
         "MATCH (u:User)-[p:PURCHASED]->(pr:Product) RETURN u.name, pr.name, p.amount";
-    match adapter.execute_cypher(cypher_query).await {
+    match adapter.execute_cypher("example_graph", cypher_query).await {
         Ok(result) => {
             println!("✅ Query executed successfully!");
             println!(
@@ -133,18 +161,15 @@ async fn main() -> TylResult<()> {
 
     // Test DatabaseLifecycle trait
     println!("\n🔄 Testing DatabaseLifecycle integration...");
-    let lifecycle_config = (
-        RedisConfig {
-            url: Some("redis://localhost:6379".to_string()),
-            host: "localhost".to_string(),
-            port: 6379,
-            password: None,
-            database: 0,
-            pool_size: 3,
-            timeout_seconds: 5,
-        },
-        "lifecycle_test".to_string(),
-    );
+    let lifecycle_config = RedisConfig {
+        url: Some("redis://localhost:6379".to_string()),
+        host: "localhost".to_string(),
+        port: 6379,
+        password: None,
+        database: 0,
+        pool_size: 3,
+        timeout_seconds: 5,
+    };
 
     match FalkorDBAdapter::connect(lifecycle_config).await {
         Ok(lifecycle_adapter) => {

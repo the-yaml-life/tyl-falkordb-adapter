@@ -17,10 +17,8 @@ async fn test_database_lifecycle_connect() {
         timeout_seconds: 10,
     };
 
-    let config = (redis_config, "test_graph".to_string());
-
     // This will fail without a running Redis instance, which is expected
-    let result = FalkorDBAdapter::connect(config).await;
+    let result = FalkorDBAdapter::connect(redis_config).await;
 
     // Verify error handling follows TYL patterns
     if let Err(error) = result {
@@ -42,10 +40,9 @@ async fn test_connection_info() {
     };
 
     // Create adapter (will fail connection but we can test connection_info)
-    if let Ok(adapter) = FalkorDBAdapter::new(config, "test_graph".to_string()).await {
+    if let Ok(adapter) = FalkorDBAdapter::new(config).await {
         let info = adapter.connection_info();
         assert!(info.contains("FalkorDB"));
-        assert!(info.contains("test_graph"));
     }
     // If creation fails (expected without Redis), that's OK for this test
 }

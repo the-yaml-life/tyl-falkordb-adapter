@@ -18,7 +18,7 @@ tyl-tracing = { git = "https://github.com/the-yaml-life/tyl-tracing.git", branch
 tyl-db-core = { git = "https://github.com/the-yaml-life/tyl-db-core.git", branch = "main" }
 
 # TYL Graph Port - as per TYL_GRAPH_PORT_GUIDE.md
-tyl-graph-port = { git = "https://github.com/the-yaml-life/tyl-graph-port.git", branch = "main" }
+tyl-graph-port = { git = "https://github.com/the-yaml-life/tyl-graph-port.git", branch = "main", features = ["mock"] }
 
 # Core async and networking (minimal for FalkorDB)
 tokio = { version = "1.35", features = ["full"] }

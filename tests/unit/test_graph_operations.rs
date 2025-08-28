@@ -5,7 +5,8 @@ use tyl_falkordb_adapter::{GraphNode, GraphRelationship};
 
 #[test]
 fn test_graph_node_with_properties() {
-    let mut node = GraphNode::new("user_123".to_string());
+    let mut node = GraphNode::new();
+    node.id = "user_123".to_string();
 
     // Add labels
     node.labels.push("User".to_string());
@@ -33,8 +34,8 @@ fn test_graph_relationship_with_properties() {
         "follows_123".to_string(),
         "user_1".to_string(),
         "user_2".to_string(),
-        "FOLLOWS".to_string(),
     );
+    relationship.relationship_type = "FOLLOWS".to_string();
 
     // Add properties
     relationship
@@ -58,7 +59,8 @@ fn test_graph_relationship_with_properties() {
 
 #[test]
 fn test_node_serialization() {
-    let mut node = GraphNode::new("test_node".to_string());
+    let mut node = GraphNode::new();
+    node.id = "test_node".to_string();
     node.labels.push("TestLabel".to_string());
     node.properties
         .insert("test_prop".to_string(), json!("test_value"));
@@ -83,8 +85,8 @@ fn test_relationship_serialization() {
         "test_rel".to_string(),
         "node_a".to_string(),
         "node_b".to_string(),
-        "TEST_TYPE".to_string(),
     );
+    relationship.relationship_type = "TEST_TYPE".to_string();
     relationship
         .properties
         .insert("test_prop".to_string(), json!(42));

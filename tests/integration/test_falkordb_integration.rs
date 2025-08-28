@@ -1,15 +1,21 @@
 //! Integration tests that require a running FalkorDB instance
 
 use serde_json::json;
+use std::collections::HashMap;
 use tyl_config::RedisConfig;
 use tyl_db_core::DatabaseLifecycle;
-use tyl_falkordb_adapter::{FalkorDBAdapter, GraphNode, GraphRelationship};
+use tyl_falkordb_adapter::{
+    FalkorDBAdapter, GraphInfo, GraphNode, GraphRelationship, GraphStore, MultiGraphManager,
+};
 
 // Helper function to check if FalkorDB is available
 async fn is_falkordb_available() -> bool {
     let config = get_test_config();
-    match FalkorDBAdapter::new(config, "test_connection".to_string()).await {
-        Ok(adapter) => adapter.health_check().await.unwrap_or(false),
+    match FalkorDBAdapter::new(config).await {
+        Ok(adapter) => match adapter.health_check().await {
+            Ok(health_result) => health_result.status.is_healthy(),
+            Err(_) => false,
+        },
         Err(_) => false,
     }
 }
@@ -36,12 +42,24 @@ async fn test_full_graph_operations() {
     }
 
     let config = get_test_config();
-    let adapter = FalkorDBAdapter::new(config, "integration_test".to_string())
+    let adapter = FalkorDBAdapter::new(config)
         .await
         .expect("Failed to create adapter");
 
+    // Create test graph
+    let graph_info = GraphInfo {
+        id: "integration_test".to_string(),
+        name: "Integration Test Graph".to_string(),
+        metadata: HashMap::new(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+
+    let _ = adapter.create_graph(graph_info).await; // Ignore result in case already exists
+
     // Test node creation
-    let mut user_node = GraphNode::new("user_integration_test".to_string());
+    let mut user_node = GraphNode::new();
+    user_node.id = "user_integration_test".to_string();
     user_node.labels.push("User".to_string());
     user_node
         .properties
@@ -51,7 +69,7 @@ async fn test_full_graph_operations() {
         .insert("email".to_string(), json!("test@example.com"));
 
     let node_id = adapter
-        .create_node(user_node.clone())
+        .create_node("integration_test", user_node.clone())
         .await
         .expect("Failed to create node");
 
@@ -59,21 +77,22 @@ async fn test_full_graph_operations() {
 
     // Test node retrieval
     let retrieved_node = adapter
-        .get_node(&node_id)
+        .get_node("integration_test", &node_id)
         .await
         .expect("Failed to retrieve node");
 
     assert!(retrieved_node.is_some());
 
     // Test creating another node for relationship
-    let mut product_node = GraphNode::new("product_integration_test".to_string());
+    let mut product_node = GraphNode::new();
+    product_node.id = "product_integration_test".to_string();
     product_node.labels.push("Product".to_string());
     product_node
         .properties
         .insert("name".to_string(), json!("Test Product"));
 
     let product_id = adapter
-        .create_node(product_node)
+        .create_node("integration_test", product_node)
         .await
         .expect("Failed to create product node");
 
@@ -82,8 +101,8 @@ async fn test_full_graph_operations() {
         "purchase_integration_test".to_string(),
         node_id.clone(),
         product_id.clone(),
-        "PURCHASED".to_string(),
     );
+    relationship.relationship_type = "PURCHASED".to_string();
     relationship
         .properties
         .insert("date".to_string(), json!("2024-01-15"));
@@ -92,7 +111,7 @@ async fn test_full_graph_operations() {
         .insert("amount".to_string(), json!(99.99));
 
     let rel_id = adapter
-        .create_relationship(relationship)
+        .create_relationship("integration_test", relationship)
         .await
         .expect("Failed to create relationship");
 
@@ -108,10 +127,9 @@ async fn test_database_lifecycle_integration() {
     }
 
     let redis_config = get_test_config();
-    let config = (redis_config, "lifecycle_test".to_string());
 
     // Test connect
-    let adapter = FalkorDBAdapter::connect(config)
+    let adapter = FalkorDBAdapter::connect(redis_config)
         .await
         .expect("Failed to connect via DatabaseLifecycle");
 
@@ -125,7 +143,6 @@ async fn test_database_lifecycle_integration() {
     // Test connection info
     let info = adapter.connection_info();
     assert!(info.contains("FalkorDB"));
-    assert!(info.contains("lifecycle_test"));
 }
 
 #[tokio::test]
@@ -137,13 +154,13 @@ async fn test_cypher_query_execution() {
     }
 
     let config = get_test_config();
-    let adapter = FalkorDBAdapter::new(config, "cypher_test".to_string())
+    let adapter = FalkorDBAdapter::new(config)
         .await
         .expect("Failed to create adapter");
 
     // Test simple Cypher query
     let result = adapter
-        .execute_cypher("RETURN 1 as number")
+        .execute_cypher("cypher_test", "RETURN 1 as number")
         .await
         .expect("Failed to execute Cypher query");
 
@@ -160,12 +177,14 @@ async fn test_error_handling_with_invalid_queries() {
     }
 
     let config = get_test_config();
-    let adapter = FalkorDBAdapter::new(config, "error_test".to_string())
+    let adapter = FalkorDBAdapter::new(config)
         .await
         .expect("Failed to create adapter");
 
     // Test invalid Cypher query
-    let result = adapter.execute_cypher("INVALID CYPHER SYNTAX").await;
+    let result = adapter
+        .execute_cypher("error_test", "INVALID CYPHER SYNTAX")
+        .await;
 
     // Should return an error
     assert!(result.is_err());
